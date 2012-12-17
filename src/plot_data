@@ -1,0 +1,129 @@
+#!/bin/bash
+
+# Check cmd line args
+if [ $# -ne 3 -a $# -ne 4 ]; then
+  echo -e "Usage: ./plot_data [NODE_NAME] [APPLICATION] [WORKLOAD]"
+  exit
+fi
+
+# Get to correct directory
+cd "../data/completed_data_capture/output_${1}/${2}" 2> /dev/null
+if [ $? -ne 0 ]; then
+   echo "${1}: Node name not found."
+#  echo -e "Node name not found.  Nodes that have data captured: "
+#  let i=0
+#  for host in aphid bumblebee cardinal chameleon cicada cobra cricket dolphin frog giraffe grizzly hippo hornet macaw monkey newt peacock perch rattlesnake rhino swan termite turtle viper
+#  do {
+#    printf "    * %-12s" ${host}
+#    let i=i+1
+#    if [ $(($i%4)) -eq 0 ]; then
+#      printf "\n"
+#    fi
+#  } done
+#  exit
+fi
+
+# For each file, plot the appropriate graphs as output
+# this is copy/pasted from /home/accts/agt5/bin/plot:
+# clear any existing intermediate files
+rm *.data *.latency *.events 2> /dev/null # throughput
+
+# calculate avg throughput and latency distributions
+for i in none naive ping_pong_ipp_hm ping_pong_ipp hobbes hobbes_bloom hobbes_hashdict
+do
+  FILENAME="${i}_${1}.out"
+
+  if [ ! -f $FILENAME ]; then
+    continue
+  fi
+
+  # filter out throughput/latency lines
+  grep "Completed" $FILENAME | smooth.pl 2 50 > $i.data
+
+  # filter events
+  grep "Beginning checkpoint capture..." $FILENAME > $i.events
+  grep "Finished capturing checkpoint" $FILENAME >> $i.events
+  grep "Now beginning to collapse checkpoints..." $FILENAME >> $i.events
+  grep "Collapsing of checkpoints done" $FILENAME >> $i.events
+
+  # calculate avg throughput
+  echo -n "$i " >> throughput
+  avg.pl 2 < $i.data >> throughput
+
+  # calculate avg data layer size
+  echo -n "$i " >> data_size
+  avg.pl 19 < $i.data >> data_size
+
+  # make latency histogram (min=3ms, max=30000ms, 100 bins, column 10)
+  hist.pl 3 30000 100 10 < $i.data > $i.latency
+done
+
+# generate plots
+gnuplot <<HERE
+dashed size 10,7
+set output "plots.eps"
+set multiplot layout 1,1
+
+set tmargin 1
+set bmargin 5
+set lmargin 15
+set rmargin 2
+
+#none
+set style line 1 lc rgb "#f7f7f7" lw 10 lt 1
+
+#naive
+set style line 2 lc rgb "#eeeeee" lw 7 lt 1
+
+#ipp
+set style line 8 lc rgb "#cccccc" lw 6 lt 1
+
+#ipp arrays
+set style line 7 lc rgb "#aaaaaa" lw 6 lt 3
+
+#calc
+set style line 3 lc rgb "#777777" lw 3 lt 1
+
+#pcalc bloom
+set style line 4 lc rgb "#555555" lw 2 lt 2
+
+#pcalc hash
+set style line 5 lc rgb "#000000" lw 1 lt 1
+
+set border 3
+
+# mid left: throughput wrt time
+set key top right
+set xlabel "time (sec)"
+set ylabel "throughput (txns/sec)"
+set xtics nomirror out
+set ytics nomirror out
+plot [92:][-1900:90000] \
+  "none.data" using 1:3 title "none" with lines ls 1, \
+  "naive.data" using 1:3 title "naive" with lines ls 2, \
+  "ping_pong_ipp_hm.data" using 1:3 title "ipp" with lines ls 8, \
+  "ping_pong_ipp.data" using 1:3 title "ipp (arrays)" with lines ls 7, \
+  "hobbes.data" using 1:3 title "CALC" with lines ls 3, \
+  "hobbes_bloom.data" using 1:3 title "pCALC (bloom)" with lines ls 4, \
+  "hobbes_hashdict.data" using 1:3 title "pCALC (hash)" with lines ls 5
+
+HERE
+
+# clear intermediate files
+rm data_size *.data *.latency *.events 2> /dev/null # throughput
+mv plots.eps "${1}_plots.eps"
+
+
+# Open all graphs for user
+OUTPUT_DIR=../../plots/${1}/${2}
+if [ -f "${3}_plots.gif" ]; then
+  mkdir -p ${OUTPUT_DIR}
+  mv "${3}_plots.gif" ${OUTPUT_DIR}
+  cd ${OUTPUT_DIR}
+fi
+
+# Display all graphs
+if [ "$4" != "no-display" ]; then
+  killall -9 evince
+  evince "${3}_plots.gif" & 2>/dev/null >/dev/null
+fi

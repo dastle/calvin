@@ -1,0 +1,70 @@
+/// @file
+/// @author Alexander Thomson (thomson@cs.yale.edu)
+/// @version 0.1
+/// @since 5 April 2012
+///
+/// @section DESCRIPTION
+///
+/// Protobuf representing a transaction request (and execution status).
+///
+/// @TODO(alex): Fix types for read_set and write_set.
+
+message TxnProto {
+  // Globally unique transaction id, specifying global order.
+  required int64 txn_id = 1;
+
+  // User-specified SQL statement to be run by QueryProcessor
+  optional string sql_code = 10;
+
+  // User-specified python code for the transaction to execute.
+  optional string python_code = 11;
+
+  // Specifies which stored procedure to invoke at execution time if no
+  // python code is provided.
+  optional int32 txn_type = 12;
+
+  // Isolation level at which to execute transaction.
+  //
+  // Note: Currently only full serializability is supported.
+  enum IsolationLevel {
+    SERIALIZABLE = 0;
+    SNAPSHOT = 1;
+    READ_COMMITTED = 2;
+    READ_UNCOMMITTED = 3;
+  };
+  optional IsolationLevel isolation_level = 13;
+
+  // True if transaction is known to span multiple database nodes.
+  optional bool multipartition = 14;
+
+  // Keys of objects read (but not modified) by this transaction.
+  repeated bytes read_set = 20;
+
+  // Keys of objects modified (but not read) by this transaction.
+  repeated bytes write_set = 21;
+
+  // Keys of objects read AND modified by this transaction.
+  repeated bytes read_write_set = 22;
+
+  // Arguments to be passed when invoking the stored procedure to execute this
+  // transaction. 'arg' is a serialized protocol message. The client and backend
+  // application code is assumed to know how to interpret this protocol message
+  // based on 'txn_type'.
+  optional bytes arg = 23;
+
+  // Transaction status.
+  //
+  /// @TODO(alex): Should this be here?
+  enum Status {
+    NEW = 0;
+    ACTIVE = 1;
+    COMMITTED = 2;
+    ABORTED = 3;
+  };
+  optional Status status = 30;
+
+  // Node ids of nodes that participate as readers and writers in this txn.
+  repeated int32 readers = 40;
+  repeated int32 writers = 41;
+}
+

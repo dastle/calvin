@@ -1,0 +1,69 @@
+# Build files only if they exist.
+$(UPPERC_DIR)_OBJS := $(patsubst %.c, $(OBJDIR)/%.o,\
+                      $(patsubst %.cpp, $(OBJDIR)/%.o,\
+                      $(patsubst %.cc, $(OBJDIR)/%.o, $($(UPPERC_DIR)_SRCS))))
+ifneq ($($(UPPERC_DIR)_EXES),)
+  $(UPPERC_DIR)_PROG := $(patsubst $(LOWERC_DIR)/%.cc, \
+                          $(BINDIR)/$(LOWERC_DIR)/%, $($(UPPERC_DIR)_EXES))
+endif
+
+# Protobuf specific instructions
+ifeq ($(LOWERC_DIR),proto)
+  $(UPPERC_DIR)_OBJS := $(patsubst %.proto, $(OBJDIR)/%.pb.o, $($(UPPERC_DIR)_OBJS))
+endif
+
+$(UPPERC_DIR)_TEST_SRCS := $(sort $(wildcard $(patsubst %.cc, %_test.cc,\
+                              $($(UPPERC_DIR)_SRCS)) $(LOWERC_DIR)/*_test.cc))
+$(UPPERC_DIR)_TEST_OBJS := $(patsubst %.cc, $(OBJDIR)/%.o, $($(UPPERC_DIR)_TEST_SRCS))
+$(UPPERC_DIR)_TESTS     := $(patsubst %.cc, $(BINDIR)/%, $($(UPPERC_DIR)_TEST_SRCS))
+
+TESTS += test-$(LOWERC_DIR)
+
+all: $(LOWERC_DIR)-all
+
+$(LOWERC_DIR)-all: $(LOWERC_DIR) $(LOWERC_DIR)-tests $(LOWERC_DIR)-scripts
+$(LOWERC_DIR): $($(UPPERC_DIR)_PROG) $($(UPPERC_DIR)_OBJS)
+$(LOWERC_DIR)-scripts:
+$(LOWERC_DIR)-tests: $($(UPPERC_DIR)_TESTS)
+
+ifeq ($(LOWERC_DIR),proto)
+  SRC_CC_FILES :=
+else
+  ifeq ($(UPPERC_DIR),QUERY_PROCESSOR_FLEX_BISON)
+    SRC_CC_FILES := $(OBJDIR)/$(LOWERC_DIR)/%.cpp
+  else
+    SRC_CC_FILES := $(LOWERC_DIR)/%.cc
+  endif
+endif
+
+$(OBJDIR)/$(LOWERC_DIR)/%.o: $(SRC_CC_FILES) $(SRC_LINKED_OBJS)
+	@echo + cxx $<
+	@mkdir -p $(@D)
+	$(V)$(CXX) $(CXXFLAGS) -o $@ -c $<
+
+$(BINDIR)/$(LOWERC_DIR)/%_test: $(OBJDIR)/$(LOWERC_DIR)/%_test.o $($(UPPERC_DIR)_OBJS) \
+                                $(TEST_LINKED_OBJS)
+	@echo + ld $@
+	@mkdir -p $(@D)
+	$(V)$(CXX) -o $@ $^ $(LDFLAGS) $(ZMQLDFLAGS)
+
+# Compiled CPP executables
+ifneq ($($(UPPERC_DIR)_EXES),)
+  $(BINDIR)/$(LOWERC_DIR)/%: $(LOWERC_DIR)/%.cc $(EXECUTABLE_OBJS) $($(UPPERC_DIR)_OBJS)
+		@echo + ld $@
+		@mkdir -p $(@D)
+		$(V)$(CXX) -o $@ $^ $(CXXFLAGS) $(LDFLAGS) $(ZMQLDFLAGS)
+endif
+
+# Usable python scripts
+ifneq ($($(UPPERC_DIR)_SCRIPTS),)
+  $(LOWERC_DIR)-scripts: $($(UPPERC_DIR)_SCRIPTS)
+		@for i in $^; do \
+			echo + $$i -\> $(BINDIR)/$${i%.*}; \
+			mkdir -p $(BINDIR)/$${i%/*}; \
+			cp -rp $$i $(BINDIR)/$${i%.*}; \
+			chmod +x $(BINDIR)/$${i%.*}; \
+		done
+endif
+
+.PHONY: $(LOWERC_DIR)-all $(LOWERC_DIR) $(LOWERC_DIR)-tests test-$(LOWERC_DIR)

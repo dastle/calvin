@@ -1,0 +1,6 @@
+#!/bin/bash
+
+tar czf src.tar.gz *
+scp -rp src.tar.gz node.zoo.cs.yale.edu:checkpointing2/src/
+ssh node.zoo.cs.yale.edu 'cd checkpointing2/src; tar xzf src.tar.gz; rm src.tar.gz'
+rm src.tar.gz

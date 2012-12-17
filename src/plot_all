@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Check cmd line args
+if [ $# -ne 1 -a $# -ne 0 ]; then
+  echo -e "Usage: ./plot_all (NODE)"
+  exit
+fi
+
+# Looping/plotting function
+# @param      node      The node we're plotting
+function plotData() {
+  node=$1
+  #app=tpcc
+  #for i in 75W 125W; do {
+  #  ./plot_data $node $app $i no-display
+  #} done
+
+  app=microbenchmark
+  for i in 50W 125W 1D 20D 50D; do {
+    ./plot_data $node $app $i no-display
+  } done
+}
+
+# We received no node
+#if [ $# -eq 0 ]; then
+#  for host in aphid bumblebee cardinal chameleon cicada cobra cricket dolphin frog giraffe grizzly hippo #hornet macaw monkey newt peacock perch rattlesnake rhino swan termite turtle viper
+#  do {
+#    plotData $host
+#  } done
+
+# We received a node
+#else
+
+plotData $1
+
+#fi

@@ -1,0 +1,1203 @@
+%skeleton "lalr1.cc"                          /*  -*- C++ -*- */
+%require "2.5"
+%defines
+%define parser_class_name "SQLParser"
+%code requires {
+#include <stdlib.h>
+#include <stdarg.h>
+#include <string>
+#include "query_processor/ast/ast.h"
+#include "query_processor/ast/ast_delete.h"
+#include "query_processor/ast/ast_insert.h"
+#include "query_processor/ast/ast_select.h"
+#include "query_processor/ast/ast_update.h"
+
+using namespace calvin;
+using std::vector;
+
+class SQLDriver;
+void yyerror(const char *s, ...);
+void emit(const char *s, ...);
+}
+// The parsing context.
+%parse-param { SQLDriver& driver }
+%parse-param { bool debug }
+%lex-param   { SQLDriver& driver }
+%locations
+%initial-action
+{
+  // Initialize the initial location.
+  @$.begin.filename = @$.end.filename = &driver.file_;
+};
+%debug
+%error-verbose
+// Symbols.
+%union
+{
+  int intval;
+  char* strval;
+  int subtok;
+  double floatval;
+  ASTExpr* ASTExpr_val;
+  ASTColList* ASTColList_val;
+  ASTValList* ASTValList_val;
+  ASTTupleVals* ASTTupleVals_val;
+  ASTSelectExpr* ASTSelectExpr_val;
+  ASTUpdateAsgnList* ASTUpdateAsgnList_val;
+  ASTRoot* astval;
+  ASTAtom* ASTAtom_val;
+  ASTKey* ASTKey_val;
+  ASTTableFactor* ASTTableFactor_val;
+  ASTGroupBy* ASTGroupBy_val;
+  ASTTableReference* ASTTableReference_val;
+  vector<ASTSelectExpr*>* select_expr_list_val;
+  vector<ASTTableReference*>* table_reference_list_val;
+};
+%code {
+# include "query_processor/flex_bison/sqldriver.h"
+}
+
+%token ENDOFFILE 0 "end of file"
+
+        /* names and literal values */
+%token <strval> NAME
+%token <strval> STRING
+%token <intval> INTNUM
+%token <intval> BOOL
+%token <floatval> APPROXNUM
+%token <strval> USERVAR
+
+       /* operators and precedence levels */
+
+%right ASSIGN
+%left OR
+%left XOR
+%left ANDOP
+%nonassoc IN IS LIKE REGEXP
+%left NOT '!'
+%left BETWEEN
+%left <subtok> COMPARISON /* = <> < > <= >= <=> */
+%left '|'
+%left '&'
+%left <subtok> SHIFT /* << >> */
+%left '+' '-'
+%left '*' '/' '%' MOD
+%left '^'
+%nonassoc UMINUS
+
+
+%token ASSIGN
+%token OR
+%token XOR
+%token ANDOP
+%token REGEXP
+%token LIKE
+%token IS
+%token IN
+%token NOT
+%token BETWEEN
+%token COMPARISON
+%token SHIFT
+%token MOD
+%token UMINUS
+%token ADD
+%token ALL
+%token ALTER
+%token ANALYZE
+%token AND
+%token ANY
+%token AS
+%token ASC
+%token AUTO_INCREMENT
+%token BEFORE
+%token BIGINT
+%token BINARY
+%token BIT
+%token BLOB
+%token BOTH
+%token BY
+%token CALL
+%token CASCADE
+%token CASE
+%token CHANGE
+%token CHAR
+%token CHECK
+%token COLLATE
+%token COLUMN
+%token COMMENT
+%token CONDITION
+%token CONSTRAINT
+%token CONTINUE
+%token CONVERT
+%token CREATE
+%token CROSS
+%token CURRENT_DATE
+%token CURRENT_TIME
+%token CURRENT_TIMESTAMP
+%token CURRENT_USER
+%token CURSOR
+%token DATABASE
+%token DATABASES
+%token DATE
+%token DATETIME
+%token DAY_HOUR
+%token DAY_MICROSECOND
+%token DAY_MINUTE
+%token DAY_SECOND
+%token DECIMAL
+%token DECLARE
+%token DEFAULT
+%token DELAYED
+%token DELETE
+%token DESC
+%token DESCRIBE
+%token DETERMINISTIC
+%token DISTINCT
+%token DISTINCTROW
+%token DIV
+%token DOUBLE
+%token DROP
+%token DUAL
+%token EACH
+%token ELSE
+%token ELSEIF
+%token ENCLOSED
+%token END
+%token ENUM
+%token ESCAPED
+%token <subtok> EXISTS
+%token EXIT
+%token EXPLAIN
+%token FETCH
+%token FLOAT
+%token FOR
+%token FORCE
+%token FOREIGN
+%token FROM
+%token FULLTEXT
+%token GRANT
+%token GROUP
+%token HAVING
+%token HIGH_PRIORITY
+%token HOUR_MICROSECOND
+%token HOUR_MINUTE
+%token HOUR_SECOND
+%token IF
+%token IGNORE
+%token INDEX
+%token INFILE
+%token INNER
+%token INOUT
+%token INSENSITIVE
+%token INSERT
+%token INT
+%token INTEGER
+%token INTERVAL
+%token INTO
+%token ITERATE
+%token JOIN
+%token KEY
+%token KEYS
+%token KILL
+%token LEADING
+%token LEAVE
+%token LEFT
+%token LIMIT
+%token LINES
+%token LOAD
+%token LOCALTIME
+%token LOCALTIMESTAMP
+%token LOCK
+%token LONG
+%token LONGBLOB
+%token LONGTEXT
+%token LOOP
+%token LOW_PRIORITY
+%token MATCH
+%token MEDIUMBLOB
+%token MEDIUMINT
+%token MEDIUMTEXT
+%token MINUTE_MICROSECOND
+%token MINUTE_SECOND
+%token MODIFIES
+%token NATURAL
+%token NO_WRITE_TO_BINLOG
+%token NULLX
+%token NUMBER
+%token ON
+%token ONDUPLICATE
+%token OPTIMIZE
+%token OPTION
+%token OPTIONALLY
+%token ORDER
+%token OUT
+%token OUTER
+%token OUTFILE
+%token PRECISION
+%token PRIMARY
+%token PROCEDURE
+%token PURGE
+%token QUICK
+%token READ
+%token READS
+%token REAL
+%token REFERENCES
+%token RELEASE
+%token RENAME
+%token REPEAT
+%token REPLACE
+%token REQUIRE
+%token RESTRICT
+%token RETURN
+%token REVOKE
+%token RIGHT
+%token ROLLUP
+%token SCHEMA
+%token SCHEMAS
+%token SECOND_MICROSECOND
+%token SELECT
+%token SENSITIVE
+%token SEPARATOR
+%token SET
+%token SHOW
+%token SMALLINT
+%token SOME
+%token SONAME
+%token SPATIAL
+%token SPECIFIC
+%token SQL
+%token SQLEXCEPTION
+%token SQLSTATE
+%token SQLWARNING
+%token SQL_BIG_RESULT
+%token SQL_CALC_FOUND_ROWS
+%token SQL_SMALL_RESULT
+%token SSL
+%token STARTING
+%token STRAIGHT_JOIN
+%token TABLE
+%token TEMPORARY
+%token TEXT
+%token TERMINATED
+%token THEN
+%token TIME
+%token TIMESTAMP
+%token TINYBLOB
+%token TINYINT
+%token TINYTEXT
+%token TO
+%token TRAILING
+%token TRIGGER
+%token UNDO
+%token UNION
+%token UNIQUE
+%token UNLOCK
+%token UNSIGNED
+%token UPDATE
+%token USAGE
+%token USE
+%token USING
+%token UTC_DATE
+%token UTC_TIME
+%token UTC_TIMESTAMP
+%token VALUES
+%token VARBINARY
+%token VARCHAR
+%token VARYING
+%token WHEN
+%token WHERE
+%token WHILE
+%token WITH
+%token WRITE
+%token YEAR
+%token YEAR_MONTH
+%token ZEROFILL
+%token FSUBSTRING
+%token FTRIM
+%token FDATE_ADD
+%token FDATE_SUB
+%token FCOUNT
+
+%type <intval> select_opts
+%type <intval> val_list opt_val_list case_list
+%type <intval> opt_with_rollup opt_asc_desc
+%type <intval> opt_inner_cross opt_outer
+%type <intval> left_or_right opt_left_or_right_outer
+
+%type <intval> delete_opts delete_list
+%type <intval> insert_opts
+%type <intval> insert_asgn_list opt_if_not_exists update_opts
+%type <intval> opt_temporary opt_length opt_binary opt_uz enum_list
+%type <intval> column_atts data_type opt_ignore_replace create_col_list
+
+%type <strval> arg
+
+%type <astval> stmt select_stmt delete_stmt insert_stmt update_stmt
+%type <ASTAtom_val> atom
+%type <ASTKey_val> key
+%type <ASTTableFactor_val> table_factor
+%type <ASTTableReference_val> table_reference
+%type <ASTGroupBy_val> groupby_list opt_groupby opt_orderby
+%type <ASTExpr_val> expr opt_where opt_having opt_limit
+%type <ASTSelectExpr_val> select_expr
+%type <ASTColList_val> opt_col_names column_list
+%type <ASTValList_val> insert_vals_list
+%type <ASTTupleVals_val> insert_vals
+%type <ASTUpdateAsgnList_val> update_asgn_list
+%type <strval> opt_as_alias
+%type <select_expr_list_val> select_expr_list
+%type <table_reference_list_val> table_references
+
+%start stmt_list
+%%
+
+stmt_list: stmt ';' { if (debug) emit("STATEMENT"); }
+  | stmt_list stmt ';' { if (debug) emit("STATEMENT LIST"); }
+  ;
+
+   /**** expressions ****/
+
+expr: NAME {
+  if (debug) emit("NAME %s\n", $1);
+  ASTExprOperand* op = new ASTExprOperand($1, NAME);
+  $$ = op;
+}  | USERVAR {
+  if (debug) emit("USERVAR %s", $1); free($1);
+}  | STRING {
+  if (debug) emit("STRING %s", $1);
+  // Remove quotation marks
+  $1++;
+  $1[strlen($1)-1] = '\0';
+  ASTExprOperand* op = new ASTExprOperand($1, STRING);
+  $$ = op;
+}  | INTNUM {
+  if (debug) emit("INTNUM %d", $1);
+  ASTExprOperand* op = new ASTExprOperand($1);
+  $$ = op;
+}  | APPROXNUM {
+  if (debug) emit("FLOAT %f", $1);
+  ASTExprOperand* op = new ASTExprOperand($1);
+  $$ = op;
+}  | BOOL {
+  if (debug) emit("BOOL %d", $1);
+  ASTExprOperand* op = new ASTExprOperand($1);
+  $$ = op;
+}
+  ;
+
+expr: '(' expr ')' {
+  $$ = $2;
+}
+  ;
+
+
+expr: expr '+' expr {
+  if (debug) emit("ADD");
+  ASTExpr* expr = new ASTExpr(ASTExpr::ADD, $1, $3);
+  $$ = expr;
+}  | expr '-' expr {
+  if (debug) emit("SUB");
+  ASTExpr* expr = new ASTExpr(ASTExpr::SUB, $1, $3);
+  $$ = expr;
+}  | expr '*' expr {
+  if (debug) emit("MUL");
+  ASTExpr* expr = new ASTExpr(ASTExpr::MUL, $1, $3);
+  $$ = expr;
+}  | expr '/' expr {
+  if (debug) emit("DIV");
+  ASTExpr* expr = new ASTExpr(ASTExpr::DIV, $1, $3);
+  $$ = expr;
+}  | expr '%' expr {
+  if (debug) emit("MOD");
+  ASTExpr* expr = new ASTExpr(ASTExpr::MOD, $1, $3);
+  $$ = expr;
+}  | expr MOD expr {
+  if (debug) emit("MOD");
+  ASTExpr* expr = new ASTExpr(ASTExpr::MOD, $1, $3);
+  $$ = expr;
+}  | '-' expr %prec UMINUS {
+  if (debug) emit("NEG");
+  ASTExpr* expr = new ASTExpr(ASTExpr::NEG, $2, NULL);
+  $$ = expr;
+}  | expr ANDOP expr {
+  if (debug) emit("AND");
+  ASTExpr* expr = new ASTExpr(ASTExpr::AND, $1, $3);
+  $$ = expr;
+} | expr OR expr {
+  if (debug) emit("OR");
+  ASTExpr* expr = new ASTExpr(ASTExpr::OR, $1, $3);
+  $$ = expr;
+} | expr XOR expr { if (debug) emit("XOR"); }
+   | expr '|' expr { if (debug) emit("BITOR"); }
+   | expr '&' expr { if (debug) emit("BITAND"); }
+   | expr '^' expr { if (debug) emit("BITXOR"); }
+   | expr SHIFT expr { if (debug) emit("SHIFT %s", $2==1?"left":"right");
+} | NOT expr {
+  if (debug) emit("NOT");
+  ASTExpr* expr = new ASTExpr(ASTExpr::NOT, $2, NULL);
+  $$ = expr;
+} | '!' expr {
+  if (debug) emit("NOT");
+  ASTExpr* expr = new ASTExpr(ASTExpr::NOT, $2, NULL);
+  $$ = expr;
+} | expr COMPARISON expr {
+  if (debug) emit("CMP %d", $2);
+  ASTExprComparison* cmp = new ASTExprComparison($1, $3, static_cast<ASTComparison>($2));
+  $$ = cmp;
+}
+  ;
+
+      /* recursive selects and comparisons thereto */
+   | expr COMPARISON '(' select_stmt ')' { if (debug) emit("CMPSELECT %d", $2); }
+   | expr COMPARISON ANY '(' select_stmt ')' { if (debug) emit("CMPANYSELECT %d", $2); }
+   | expr COMPARISON SOME '(' select_stmt ')' { if (debug) emit("CMPANYSELECT %d", $2); }
+   | expr COMPARISON ALL '(' select_stmt ')' { if (debug) emit("CMPALLSELECT %d", $2); }
+   ;
+
+
+expr:  expr IS NULLX     { if (debug) emit("ISNULL"); }
+   |   expr IS NOT NULLX { if (debug) emit("ISNULL"); if (debug) emit("NOT"); }
+   |   expr IS BOOL      { if (debug) emit("ISBOOL %d", $3); }
+   |   expr IS NOT BOOL  { if (debug) emit("ISBOOL %d", $4); if (debug) emit("NOT"); }
+
+   | USERVAR ASSIGN expr { if (debug) emit("ASSIGN @%s", $1); free($1); }
+   ;
+
+expr: expr BETWEEN expr AND expr %prec BETWEEN { if (debug) emit("BETWEEN"); }
+   ;
+
+val_list: expr { $$ = 1; }
+   | expr ',' val_list { $$ = 1 + $3; }
+   ;
+
+opt_val_list: /* nil */ { $$ = 0; }
+   | val_list
+   ;
+
+expr: expr IN '(' val_list ')'       { if (debug) emit("ISIN %d", $4); }
+   | expr NOT IN '(' val_list ')'    { if (debug) emit("ISIN %d", $5); if (debug) emit("NOT"); }
+   | expr IN '(' select_stmt ')'     { if (debug) emit("CMPANYSELECT 4"); }
+   | expr NOT IN '(' select_stmt ')' { if (debug) emit("CMPALLSELECT 3"); }
+   | EXISTS '(' select_stmt ')'      { if (debug) emit("EXISTSSELECT"); if($1)if (debug) emit("NOT"); }
+   ;
+
+arg: /* nil */ {$$ = NULL;}
+   | '*'
+   | NAME
+   ;
+
+  /* regular functions */
+expr: NAME '(' arg ')' {
+  if (debug) emit("CALL %d %s", $3, $1);
+  ASTExprFunction* exprFunc = new ASTExprFunction (NULL, NULL, $1, $3);
+  $$ = exprFunc;
+}
+   ;
+
+  /* functions with special syntax */
+expr: FCOUNT '(' '*' ')' { if (debug) emit("COUNTALL"); }
+   | FCOUNT '(' expr ')' { if (debug) emit(" CALL 1 COUNT"); }
+
+expr: FSUBSTRING '(' val_list ')'               {  if (debug) emit("CALL %d SUBSTR", $3); }
+   | FSUBSTRING '(' expr FROM expr ')'          {  if (debug) emit("CALL 2 SUBSTR"); }
+   | FSUBSTRING '(' expr FROM expr FOR expr ')' {  if (debug) emit("CALL 3 SUBSTR"); }
+
+   | FTRIM '(' val_list ')'                     { if (debug) emit("CALL %d TRIM", $3); }
+   | FTRIM '(' trim_ltb expr FROM val_list ')'  { if (debug) emit("CALL 3 TRIM"); }
+   ;
+
+trim_ltb: LEADING { if (debug) emit("NUMBER 1"); }
+   | TRAILING     { if (debug) emit("NUMBER 2"); }
+   | BOTH         { if (debug) emit("NUMBER 3"); }
+   ;
+
+expr: FDATE_ADD '(' expr ',' interval_exp ')' { if (debug) emit("CALL 3 DATE_ADD"); }
+   |  FDATE_SUB '(' expr ',' interval_exp ')' { if (debug) emit("CALL 3 DATE_SUB"); }
+   ;
+
+interval_exp: INTERVAL expr DAY_HOUR { if (debug) emit("NUMBER 1"); }
+   | INTERVAL expr DAY_MICROSECOND   { if (debug) emit("NUMBER 2"); }
+   | INTERVAL expr DAY_MINUTE        { if (debug) emit("NUMBER 3"); }
+   | INTERVAL expr DAY_SECOND        { if (debug) emit("NUMBER 4"); }
+   | INTERVAL expr YEAR_MONTH        { if (debug) emit("NUMBER 5"); }
+   | INTERVAL expr YEAR              { if (debug) emit("NUMBER 6"); }
+   | INTERVAL expr HOUR_MICROSECOND  { if (debug) emit("NUMBER 7"); }
+   | INTERVAL expr HOUR_MINUTE       { if (debug) emit("NUMBER 8"); }
+   | INTERVAL expr HOUR_SECOND       { if (debug) emit("NUMBER 9"); }
+   ;
+
+expr: CASE expr case_list END           { if (debug) emit("CASEVAL %d 0", $3); }
+   |  CASE expr case_list ELSE expr END { if (debug) emit("CASEVAL %d 1", $3); }
+   |  CASE case_list END                { if (debug) emit("CASE %d 0", $2); }
+   |  CASE case_list ELSE expr END      { if (debug) emit("CASE %d 1", $2); }
+   ;
+
+case_list: WHEN expr THEN expr     { $$ = 1; }
+         | case_list WHEN expr THEN expr { $$ = $1+1; }
+   ;
+
+expr: expr LIKE expr { if (debug) emit("LIKE"); }
+   | expr NOT LIKE expr { if (debug) emit("LIKE"); if (debug) emit("NOT"); }
+   ;
+
+expr: expr REGEXP expr { if (debug) emit("REGEXP"); }
+   | expr NOT REGEXP expr { if (debug) emit("REGEXP"); if (debug) emit("NOT"); }
+   ;
+
+expr: CURRENT_TIMESTAMP { if (debug) emit("NOW"); };
+   | CURRENT_DATE       { if (debug) emit("NOW"); };
+   | CURRENT_TIME       { if (debug) emit("NOW"); };
+   ;
+
+expr: BINARY expr %prec UMINUS { if (debug) emit("STRTOBIN"); }
+   ;
+
+   /* statements: select statement */
+
+stmt: select_stmt {
+  if (debug) emit("STMT");
+  driver.result_ = $1;
+}
+;
+
+select_stmt: SELECT select_opts select_expr_list {
+  if (debug) emit("SELECTNODATA %d %d", $2, $3);
+}  | SELECT select_opts select_expr_list FROM table_references opt_where opt_groupby opt_having opt_orderby opt_limit opt_into_list {
+  if (debug) emit("SELECT...");
+  ASTSelect* node = new ASTSelect();
+  // Set expression list
+  node->select_all_ = ($3 == NULL);
+  if ($3 != NULL)
+    node->select_expr_list_ = $3;
+  // Set table references
+  node->table_references_ = $5;
+  // Set WHERE
+  node->where_ = $6;
+  // Set GROUP BY
+  node->group_by_ = $7;
+  // Set HAVING
+  node->having_ = $8;
+  // Set ORDER BY
+  node->order_by_ = $9;
+  // Set LIMIT
+  node->limit_ = static_cast<ASTExprOperand*>$10;
+  $$ = node;
+}
+;
+
+opt_where: /* nil */ {
+  $$ = NULL;
+} | WHERE expr {
+  if (debug) emit("WHERE");
+  $$ = $2;
+}
+  ;
+
+opt_groupby: /* nil */ {
+  $$ = NULL;
+}  | GROUP BY groupby_list opt_with_rollup {
+  if (debug) emit("GROUPBYLIST %d %d", $3, $4);
+  $$ = $3;
+}
+;
+
+groupby_list: expr opt_asc_desc {
+  if (debug) emit("GROUPBY %d",  $2);
+  ASTGroupBy* groupBy = new ASTGroupBy();
+  groupBy->add_attributes(static_cast<ASTExprOperand*>$1);
+  groupBy->add_asc_or_desc($2);
+  $$ = groupBy;
+}  | groupby_list ',' expr opt_asc_desc {
+  if (debug) emit("GROUPBY %d",  $4);
+  ($1)->add_attributes(static_cast<ASTExprOperand*>$3);
+  ($1)->add_asc_or_desc($4);
+  $$ = $1;
+}
+   ;
+
+opt_asc_desc: /* nil */ { $$ = -1; }
+   | ASC                { $$ = 0; }
+   | DESC               { $$ = 1; }
+    ;
+
+opt_with_rollup: /* nil */  { $$ = 0; }
+   | WITH ROLLUP  { $$ = 1; }
+   ;
+
+opt_having: /* nil */ {
+  $$ = NULL;
+}  | HAVING expr {
+  if (debug) emit("HAVING");
+  $$ = $2;
+}
+
+opt_orderby: /* nil */ {
+  $$ = NULL;
+}  | ORDER BY groupby_list {
+  if (debug) emit("ORDERBY %d", $3);
+  $$ = $3;
+}
+   ;
+
+opt_limit: /* nil */ {
+  $$ = NULL;
+}  | LIMIT expr {
+  if (debug) emit("LIMIT 1");
+  $$ = $2;
+}
+  /* Support for this use case of LIMIT is currently unavailable */
+  /* | LIMIT expr ',' expr             { if (debug) emit("LIMIT 2"); } */
+  ;
+
+opt_into_list: /* nil */
+   | INTO column_list { if (debug) emit("INTO %d", $2); }
+   ;
+
+column_list: NAME {
+  if (debug) emit("COLUMN %s", $1);
+  ASTColList* node = new ASTColList();
+  node->add_col_list($1);
+  $$ = node;
+}  | column_list ',' NAME  {
+  if (debug) emit("COLUMN %s", $3);
+  ($1)->add_col_list($3);
+  $$ = $1;
+}
+  ;
+
+select_opts:                          { $$ = 0; }
+| select_opts ALL
+   { if($1 & 01) yyerror("duplicate ALL option"); $$ = $1 | 01; }
+| select_opts DISTINCT
+   { if($1 & 02) yyerror("duplicate DISTINCT option"); $$ = $1 | 02; }
+| select_opts DISTINCTROW
+   { if($1 & 04) yyerror("duplicate DISTINCTROW option"); $$ = $1 | 04; }
+    ;
+
+select_expr_list: select_expr {
+    vector<ASTSelectExpr*>* list = new vector<ASTSelectExpr*>();
+    list->push_back($1);
+    $$ = list;
+  }
+| select_expr_list ',' select_expr {
+    $1->push_back($3);
+    $$ = $1;
+  }
+| '*' {
+    if (debug) emit("SELECTALL");
+    $$ = NULL;
+  }
+;
+
+select_expr: expr opt_as_alias {
+  ASTExprOperand* op = static_cast<ASTExprOperand*>($1);
+  ASTSelectExpr* select_expr = ASTSelectExpr::create($2, op);
+  $$ = select_expr;
+};
+
+opt_as_alias: AS NAME { emit("ALIAS %s", $2); $$ = $2; }
+  | NAME              { emit("ALIAS %s", $1); $$ = $1; }
+  | /* nil */ { $$ = NULL; }
+  ;
+
+table_references: table_reference {
+  vector<ASTTableReference*>* trs = new vector<ASTTableReference*>();
+  trs->push_back($1);
+  $$ = trs;
+} | table_references ',' table_reference {
+  $1->push_back($3);
+  $$ = $1;
+}
+  ;
+
+table_reference: table_factor {
+  ASTTableReference* tr = ASTTableReference::create($1, NULL);
+  $$ = tr;
+} | join_table {
+  // For now, just create an empty table reference so parser doesn't complain
+  ASTTableReference* tr = ASTTableReference::create(NULL, NULL);
+  $$ = tr;
+}
+  ;
+
+table_factor: key opt_as_alias {
+  if (debug) emit("Table factor");
+  ASTTableFactor* tf = new ASTTableFactor($1, $2);
+  $$ = tf;
+} | table_subquery opt_as NAME { if (debug) emit("SUBQUERYAS %s", $3); free($3);} | '(' table_references ')' { if (debug) emit("TABLEREFERENCES %d", $2); }
+  ;
+
+key: atom {
+  if (debug) emit("KEY");
+  ASTKey* key = new ASTKey($1);
+  $$ = key;
+} | key '.' atom {
+  $1->AddAtom($3);
+  $$ = $1;
+}
+  ;
+
+atom: NAME {
+  if (debug) emit("ATOM");
+  ASTAtom* atom = new ASTAtom($1, 0);
+  $$ = atom;
+} | NAME '(' INTNUM ')' {
+  if (debug) emit("ATOM (INT)");
+  ASTAtom* atom = new ASTAtom($1, $3);
+  $$ = atom;
+}
+  ;
+
+opt_as: AS
+  | /* nil */
+  ;
+
+join_table:
+    table_reference opt_inner_cross JOIN table_factor opt_join_condition
+                  { if (debug) emit("JOIN %d", 100+$2); }
+  | table_reference STRAIGHT_JOIN table_factor
+                  { if (debug) emit("JOIN %d", 200); }
+  | table_reference STRAIGHT_JOIN table_factor ON expr
+                  { if (debug) emit("JOIN %d", 200); }
+  | table_reference left_or_right opt_outer JOIN table_factor join_condition
+                  { if (debug) emit("JOIN %d", 300+$2+$3); }
+  | table_reference NATURAL opt_left_or_right_outer JOIN table_factor
+                  { if (debug) emit("JOIN %d", 400+$3); }
+  ;
+
+opt_inner_cross: /* nil */ { $$ = 0; }
+   | INNER { $$ = 1; }
+   | CROSS  { $$ = 2; }
+;
+
+opt_outer: /* nil */  { $$ = 0; }
+   | OUTER {$$ = 4; }
+   ;
+
+left_or_right: LEFT { $$ = 1; }
+    | RIGHT { $$ = 2; }
+    ;
+
+opt_left_or_right_outer: LEFT opt_outer { $$ = 1 + $2; }
+   | RIGHT opt_outer  { $$ = 2 + $2; }
+   | /* nil */ { $$ = 0; }
+   ;
+
+opt_join_condition: /* nil */
+   | join_condition ;
+
+join_condition:
+    ON expr { if (debug) emit("ONEXPR"); }
+    | USING '(' column_list ')' { if (debug) emit("USING %d", $3); }
+    ;
+
+table_subquery: '(' select_stmt ')' { if (debug) emit("SUBQUERY"); }
+   ;
+
+   /* statements: delete statement */
+
+stmt: delete_stmt {
+  if (debug) emit("STMT");
+  driver.result_ = $1;
+}
+   ;
+
+   /* single table delete */
+delete_stmt: DELETE delete_opts FROM key opt_where opt_orderby opt_limit {
+  if (debug) emit("DELETEONE %d %s", $2, $4);
+  ASTDelete* node = new ASTDelete($4, $5, $6, static_cast<ASTExprOperand*>$7);
+  $$ = node;
+}
+;
+
+delete_opts: delete_opts LOW_PRIORITY { $$ = $1 + 01; }
+   | delete_opts QUICK { $$ = $1 + 02; }
+   | delete_opts IGNORE { $$ = $1 + 04; }
+   | /* nil */ { $$ = 0; }
+   ;
+
+   /* multitable delete, first version */
+delete_stmt: DELETE delete_opts
+    delete_list
+    FROM table_references opt_where
+            { if (debug) emit("DELETEMULTI %d %d %d", $2, $3, $5); }
+
+delete_list: NAME opt_dot_star { if (debug) emit("TABLE %s", $1); free($1); $$ = 1; }
+   | delete_list ',' NAME opt_dot_star
+            { if (debug) emit("TABLE %s", $3); free($3); $$ = $1 + 1; }
+   ;
+
+opt_dot_star: /* nil */ | '.' '*' ;
+
+   /* multitable delete, second version */
+delete_stmt: DELETE delete_opts
+    FROM delete_list
+    USING table_references opt_where
+            { if (debug) emit("DELETEMULTI %d %d %d", $2, $4, $6); }
+;
+
+   /* statements: insert statement */
+
+stmt: insert_stmt {
+  if (debug) emit("STMT");
+  driver.result_ = $1;
+}
+   ;
+
+insert_stmt: INSERT insert_opts opt_into key opt_col_names VALUES insert_vals_list opt_ondupupdate {
+  if (debug) emit("INSERTVALS %d %d %s", $2, $7, $4);
+  ASTInsert* node = new ASTInsert ($4, $5, $7);
+  $$ = node;
+}
+   ;
+
+opt_ondupupdate: /* nil */
+   | ONDUPLICATE KEY UPDATE insert_asgn_list { if (debug) emit("DUPUPDATE %d", $4); }
+   ;
+
+insert_opts: /* nil */ { $$ = 0; }
+   | insert_opts LOW_PRIORITY { $$ = $1 | 01 ; }
+   | insert_opts DELAYED { $$ = $1 | 02 ; }
+   | insert_opts HIGH_PRIORITY { $$ = $1 | 04 ; }
+   | insert_opts IGNORE { $$ = $1 | 010 ; }
+   ;
+
+opt_into: INTO | /* nil */
+   ;
+
+opt_col_names: /* nil */ {
+  $$ = NULL;
+}  | '(' column_list ')' {
+  if (debug) emit("INSERTCOLS %d", $2);
+  $$ = $2;
+}
+   ;
+
+insert_vals_list: '(' insert_vals ')' {
+  if (debug) emit("VALUES %d", $2);
+  ASTValList* node = new ASTValList();
+  node->add_tuples($2);
+  $$ = node;
+}  | insert_vals_list ',' '(' insert_vals ')' {
+  if (debug) emit("VALUES %d", $4);
+  ($1)->add_tuples($4);
+  $$ = $1;
+}
+
+insert_vals: expr {
+  ASTTupleVals* node = new ASTTupleVals();
+  node->add_attributes($1);
+  $$ = node;
+}  | DEFAULT {
+  if (debug) emit("DEFAULT");
+  ASTTupleVals* node = new ASTTupleVals();
+  node->add_attributes(NULL);
+  $$ = node;
+}  | insert_vals ',' expr {
+  ($1)->add_attributes($3);
+  $$ = $1;
+}  | insert_vals ',' DEFAULT {
+  if (debug) emit("DEFAULT");
+  ($1)->add_attributes(NULL);
+  $$ = $1;
+}
+   ;
+
+insert_stmt: INSERT insert_opts opt_into NAME
+    SET insert_asgn_list
+    opt_ondupupdate
+     { if (debug) emit("INSERTASGN %d %d %s", $2, $6, $4); free($4); }
+   ;
+
+insert_asgn_list:
+     NAME COMPARISON expr
+       { if ($2 != 4) { yyerror("bad insert assignment to %s", $1); YYERROR; }
+       if (debug) emit("ASSIGN %s", $1); free($1); $$ = 1; }
+   | NAME COMPARISON DEFAULT
+       { if ($2 != 4) { yyerror("bad insert assignment to %s", $1); YYERROR; }
+                 if (debug) emit("DEFAULT"); if (debug) emit("ASSIGN %s", $1); free($1); $$ = 1; }
+   | insert_asgn_list ',' NAME COMPARISON expr
+       { if ($4 != 4) { yyerror("bad insert assignment to %s", $1); YYERROR; }
+                 if (debug) emit("ASSIGN %s", $3); free($3); $$ = $1 + 1; }
+   | insert_asgn_list ',' NAME COMPARISON DEFAULT
+       { if ($4 != 4) { yyerror("bad insert assignment to %s", $1); YYERROR; }
+                 if (debug) emit("DEFAULT"); if (debug) emit("ASSIGN %s", $3); free($3); $$ = $1 + 1; }
+   ;
+
+insert_stmt: INSERT insert_opts opt_into NAME opt_col_names
+    select_stmt
+    opt_ondupupdate { if (debug) emit("INSERTSELECT %d %s", $2, $4); free($4); }
+  ;
+
+   /** replace just like insert **/
+stmt: replace_stmt { if (debug) emit("STMT"); }
+   ;
+
+replace_stmt: REPLACE insert_opts opt_into NAME
+     opt_col_names
+     VALUES insert_vals_list
+     opt_ondupupdate { if (debug) emit("REPLACEVALS %d %d %s", $2, $7, $4); free($4); }
+   ;
+
+replace_stmt: REPLACE insert_opts opt_into NAME
+    SET insert_asgn_list
+    opt_ondupupdate
+     { if (debug) emit("REPLACEASGN %d %d %s", $2, $6, $4); free($4); }
+   ;
+
+replace_stmt: REPLACE insert_opts opt_into NAME opt_col_names
+    select_stmt
+    opt_ondupupdate { if (debug) emit("REPLACESELECT %d %s", $2, $4); free($4); }
+  ;
+
+/** update **/
+stmt: update_stmt {
+  if (debug) emit("STMT");
+  driver.result_ = $1;
+}
+   ;
+
+update_stmt: UPDATE update_opts key SET update_asgn_list opt_where opt_orderby opt_limit {
+  if (debug) emit("UPDATE %d %d %d", $2, $3, $5);
+  ASTUpdate* node = new ASTUpdate($3, $5, $6, $7, static_cast<ASTExprOperand*>$8);
+  $$ = node;
+}
+;
+
+update_opts: /* nil */ { $$ = 0; }
+   | insert_opts LOW_PRIORITY { $$ = $1 | 01 ; }
+   | insert_opts IGNORE { $$ = $1 | 010 ; }
+   ;
+
+update_asgn_list: NAME COMPARISON expr {
+  if ($2 != 4) {
+    yyerror("bad update assignment to %s", $1);
+    YYERROR;
+  } if (debug) emit("ASSIGN %s", $1);
+  ASTAssignment* assignment = new ASTAssignment($1, $3);
+  ASTUpdateAsgnList* list = new ASTUpdateAsgnList();
+  list->add_assignments(assignment);
+  $$ = list;
+} | update_asgn_list ',' NAME COMPARISON expr {
+  if ($4 != 4) {
+    yyerror("bad update assignment to %s", $3);
+    YYERROR;
+  } if (debug) emit("ASSIGN %s.%s", $3);
+  ASTAssignment* assignment = new ASTAssignment($3, $5);
+  ($1)->add_assignments(assignment);
+  $$ = $1;
+} 
+  /* This syntax is currently not supported because we are doing single table */
+  /* updates only. */
+  /* | NAME '.' NAME COMPARISON expr { */
+  /* if ($4 != 4) { */
+  /* yyerror("bad update assignment to %s", $1); */
+  /* YYERROR; */
+  /*} if (debug) emit("ASSIGN %s.%s", $1, $3); free($1); free($3); $$ = 1;*/
+  /*}*/
+
+  /* This syntax is not supported for the same reason as the rules right above*/
+  /*| update_asgn_list ',' NAME '.' NAME COMPARISON expr {*/
+  /*if ($6 != 4) {*/
+  /*  yyerror("bad update  assignment to %s.$s", $3, $5);*/
+  /*  YYERROR;*/
+  /*} if (debug) emit("ASSIGN %s.%s", $3, $5); free($3); free($5); $$ = 1;*/
+  /*}*/
+   ;
+
+   /** create database **/
+
+stmt: create_database_stmt { if (debug) emit("STMT"); }
+   ;
+
+create_database_stmt:
+     CREATE DATABASE opt_if_not_exists NAME
+       { if (debug) emit("CREATEDATABASE %d %s", $3, $4); free($4); }
+   | CREATE SCHEMA opt_if_not_exists NAME
+       { if (debug) emit("CREATEDATABASE %d %s", $3, $4); free($4); }
+   ;
+
+opt_if_not_exists:  /* nil */ { $$ = 0; }
+   | IF EXISTS
+       { if(!$2) { yyerror("IF EXISTS doesn't exist"); YYERROR; }
+                        $$ = $2; /* NOT EXISTS hack */ }
+   ;
+
+   /** create table **/
+stmt: create_table_stmt { if (debug) emit("STMT"); }
+   ;
+
+create_table_stmt: CREATE opt_temporary TABLE opt_if_not_exists NAME
+   '(' create_col_list ')' { if (debug) emit("CREATE %d %d %d %s", $2, $4, $7, $5); free($5); }
+   ;
+
+create_table_stmt: CREATE opt_temporary TABLE opt_if_not_exists NAME '.' NAME
+   '(' create_col_list ')' { if (debug) emit("CREATE %d %d %d %s.%s", $2, $4, $9, $5, $7);
+                          free($5); free($7); }
+   ;
+
+create_table_stmt: CREATE opt_temporary TABLE opt_if_not_exists NAME
+   '(' create_col_list ')'
+create_select_statement { if (debug) emit("CREATESELECT %d %d %d %s", $2, $4, $7, $5); free($5); }
+    ;
+
+create_table_stmt: CREATE opt_temporary TABLE opt_if_not_exists NAME
+   create_select_statement { if (debug) emit("CREATESELECT %d %d 0 %s", $2, $4, $5); free($5); }
+    ;
+
+create_table_stmt: CREATE opt_temporary TABLE opt_if_not_exists NAME '.' NAME
+   '(' create_col_list ')'
+   create_select_statement  { if (debug) emit("CREATESELECT %d %d 0 %s.%s", $2, $4, $5, $7);
+                              free($5); free($7); }
+    ;
+
+create_table_stmt: CREATE opt_temporary TABLE opt_if_not_exists NAME '.' NAME
+   create_select_statement { if (debug) emit("CREATESELECT %d %d 0 %s.%s", $2, $4, $5, $7);
+                          free($5); free($7); }
+    ;
+
+opt_temporary:   /* nil */ { $$ = 0; }
+   | TEMPORARY { $$ = 1;}
+   ;
+
+create_col_list: create_definition { $$ = 1; }
+    | create_col_list ',' create_definition { $$ = $1 + 1; }
+    ;
+
+create_definition: PRIMARY KEY '(' column_list ')'    { if (debug) emit("PRIKEY %d", $4); }
+    | KEY '(' column_list ')'            { if (debug) emit("KEY %d", $3); }
+    | INDEX '(' column_list ')'          { if (debug) emit("KEY %d", $3); }
+    | FULLTEXT INDEX '(' column_list ')' { if (debug) emit("TEXTINDEX %d", $4); }
+    | FULLTEXT KEY '(' column_list ')'   { if (debug) emit("TEXTINDEX %d", $4); }
+    ;
+
+create_definition: { if (debug) emit("STARTCOL"); } NAME data_type column_atts
+                   { if (debug) emit("COLUMNDEF %d %s", $3, $2); free($2); }
+
+column_atts: /* nil */ { $$ = 0; }
+    | column_atts NOT NULLX             { if (debug) emit("ATTR NOTNULL"); $$ = $1 + 1; }
+    | column_atts NULLX
+    | column_atts DEFAULT STRING
+        { if (debug) emit("ATTR DEFAULT STRING %s", $3); free($3); $$ = $1 + 1; }
+    | column_atts DEFAULT INTNUM
+        { if (debug) emit("ATTR DEFAULT NUMBER %d", $3); $$ = $1 + 1; }
+    | column_atts DEFAULT APPROXNUM
+        { if (debug) emit("ATTR DEFAULT FLOAT %g", $3); $$ = $1 + 1; }
+    | column_atts DEFAULT BOOL
+        { if (debug) emit("ATTR DEFAULT BOOL %d", $3); $$ = $1 + 1; }
+    | column_atts AUTO_INCREMENT
+        { if (debug) emit("ATTR AUTOINC"); $$ = $1 + 1; }
+    | column_atts UNIQUE '(' column_list ')'
+        { if (debug) emit("ATTR UNIQUEKEY %d", $4); $$ = $1 + 1; }
+    | column_atts UNIQUE KEY { if (debug) emit("ATTR UNIQUEKEY"); $$ = $1 + 1; }
+    | column_atts PRIMARY KEY { if (debug) emit("ATTR PRIKEY"); $$ = $1 + 1; }
+    | column_atts KEY { if (debug) emit("ATTR PRIKEY"); $$ = $1 + 1; }
+    | column_atts COMMENT STRING
+        { if (debug) emit("ATTR COMMENT %s", $3); free($3); $$ = $1 + 1; }
+    ;
+
+opt_length: /* nil */ { $$ = 0; }
+   | '(' INTNUM ')' { $$ = $2; }
+   | '(' INTNUM ',' INTNUM ')' { $$ = $2 + 1000*$4; }
+   ;
+
+opt_binary: /* nil */ { $$ = 0; }
+   | BINARY { $$ = 4000; }
+   ;
+
+opt_uz: /* nil */ { $$ = 0; }
+   | opt_uz UNSIGNED { $$ = $1 | 1000; }
+   | opt_uz ZEROFILL { $$ = $1 | 2000; }
+   ;
+
+opt_csc: /* nil */
+   | opt_csc CHAR SET STRING { if (debug) emit("COLCHARSET %s", $4); free($4); }
+   | opt_csc COLLATE STRING { if (debug) emit("COLCOLLATE %s", $3); free($3); }
+   ;
+
+data_type:
+     BIT opt_length { $$ = 10000 + $2; }
+   | TINYINT opt_length opt_uz { $$ = 10000 + $2; }
+   | SMALLINT opt_length opt_uz { $$ = 20000 + $2 + $3; }
+   | MEDIUMINT opt_length opt_uz { $$ = 30000 + $2 + $3; }
+   | INT opt_length opt_uz { $$ = 40000 + $2 + $3; }
+   | INTEGER opt_length opt_uz { $$ = 50000 + $2 + $3; }
+   | BIGINT opt_length opt_uz { $$ = 60000 + $2 + $3; }
+   | REAL opt_length opt_uz { $$ = 70000 + $2 + $3; }
+   | DOUBLE opt_length opt_uz { $$ = 80000 + $2 + $3; }
+   | FLOAT opt_length opt_uz { $$ = 90000 + $2 + $3; }
+   | DECIMAL opt_length opt_uz { $$ = 110000 + $2 + $3; }
+   | DATE { $$ = 100001; }
+   | TIME { $$ = 100002; }
+   | TIMESTAMP { $$ = 100003; }
+   | DATETIME { $$ = 100004; }
+   | YEAR { $$ = 100005; }
+   | CHAR opt_length opt_csc { $$ = 120000 + $2; }
+   | VARCHAR '(' INTNUM ')' opt_csc { $$ = 130000 + $3; }
+   | BINARY opt_length { $$ = 140000 + $2; }
+   | VARBINARY '(' INTNUM ')' { $$ = 150000 + $3; }
+   | TINYBLOB { $$ = 160001; }
+   | BLOB { $$ = 160002; }
+   | MEDIUMBLOB { $$ = 160003; }
+   | LONGBLOB { $$ = 160004; }
+   | TINYTEXT opt_binary opt_csc { $$ = 170000 + $2; }
+   | TEXT opt_binary opt_csc { $$ = 171000 + $2; }
+   | MEDIUMTEXT opt_binary opt_csc { $$ = 172000 + $2; }
+   | LONGTEXT opt_binary opt_csc { $$ = 173000 + $2; }
+   | ENUM '(' enum_list ')' opt_csc { $$ = 200000 + $3; }
+   | SET '(' enum_list ')' opt_csc { $$ = 210000 + $3; }
+   ;
+
+enum_list: STRING { if (debug) emit("ENUMVAL %s", $1); free($1); $$ = 1; }
+   | enum_list ',' STRING { if (debug) emit("ENUMVAL %s", $3); free($3); $$ = $1 + 1; }
+   ;
+
+create_select_statement: opt_ignore_replace opt_as select_stmt { if (debug) emit("CREATESELECT %d", $1); }
+   ;
+
+opt_ignore_replace: /* nil */ { $$ = 0; }
+   | IGNORE { $$ = 1; }
+   | REPLACE { $$ = 2; }
+   ;
+
+   /**** set user variables ****/
+
+stmt: set_stmt { if (debug) emit("STMT"); }
+   ;
+
+set_stmt: SET set_list ;
+
+set_list: set_expr | set_list ',' set_expr ;
+
+set_expr:
+      USERVAR COMPARISON expr { if ($2 != 4) { yyerror("bad set to @%s", $1); YYERROR; }
+                 if (debug) emit("SET %s", $1); free($1); }
+    | USERVAR ASSIGN expr { if (debug) emit("SET %s", $1); free($1); }
+    ;
+
+%%
+void yy::SQLParser::error(const yy::SQLParser::location_type& l,
+                           const std::string& m) {
+  driver.Error(l, m);
+}
+
+void emit(const char *s, ...) {
+  va_list ap;
+  va_start(ap, s);
+
+  vfprintf(stdout, s, ap);
+  printf("\n");
+}
+
+void yyerror(const char *s, ...) {
+  extern int yylineno;
+
+  va_list ap;
+  va_start(ap, s);
+
+  fprintf(stderr, "%d: error: ", yylineno);
+  vfprintf(stderr, s, ap);
+  fprintf(stderr, "\n");
+  fprintf(stderr, "Invalid query syntax\n");
+  exit(1);
+}

@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# Check cmd line args
+if [ $# -ne 2 -a $# -ne 3 ]; then
+  echo -e "Usage: ./scale_time_all [BEGIN] [END] (NODE)"
+  exit
+fi
+
+# Create proper output dirs
+BEGINNING=${1}
+ENDING=${2}
+OUTPUT_DIR="checkpoint_${BEGINNING}_${ENDING}"
+
+# Looping/plotting function
+# 
+# @param      node      The node we're plotting
+# @param      
+function scaleData() {
+  node=$1
+  app=tpcc
+  for type in none naive hobbes hobbes_hashdict hobbes_bloom ping_pong ping_pong_ipp ping_pong_ipp_hm; do { 
+    for i in 75W 125W; do {
+      if [ -f "completed_data_capture/output_${node}/${app}/${type}_${i}.out" ]; then
+        show_only.py "completed_data_capture/output_${node}/${app}/${type}_${i}.out" $BEGINNING $ENDING > "${OUTPUT_DIR}/output_${node}/${app}/${type}_${i}.out"
+      fi
+    } done
+  } done
+
+  app=microbenchmark
+  for type in none naive hobbes hobbes_hashdict hobbes_bloom ping_pong ping_pong_ipp ping_pong_ipp_hm; do { 
+    for i in 50W 125W 1D 20D 50D; do {
+      if [ -f "completed_data_capture/output_${node}/${app}/${type}_${i}.out" ]; then
+        show_only.py "completed_data_capture/output_${node}/${app}/${type}_${i}.out" $BEGINNING $ENDING > "${OUTPUT_DIR}/output_${node}/${app}/${type}_${i}.out"
+      fi
+    } done
+  } done
+}
+
+# We received no node
+if [ $# -eq 2 ]; then
+  for host in aphid bumblebee cardinal chameleon cicada cobra cricket dolphin frog giraffe grizzly hippo hornet macaw monkey newt peacock perch rattlesnake rhino swan termite turtle viper
+  do {
+    if [ -d "completed_data_capture/output_${host}" ]; then
+      mkdir -p "${OUTPUT_DIR}/output_${host}/microbenchmark" "${OUTPUT_DIR}/output_${host}/tpcc"
+      scaleData $host
+    fi
+  } done
+
+# We received a node
+else
+  if [ -d "completed_data_capture/output_${3}" ]; then 
+    mkdir -p "${OUTPUT_DIR}/output_${3}/microbenchmark" "${OUTPUT_DIR}/output_${3}/tpcc"
+    scaleData ${3}
+  fi
+fi
+
+rm completed_data_capture
+ln --symbolic ${OUTPUT_DIR} completed_data_capture
+./plot_all ${3}

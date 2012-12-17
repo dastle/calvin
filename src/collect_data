@@ -1,0 +1,173 @@
+#!/bin/bash
+
+# Check cmd line args
+if [ $# -ne 0 ]; then
+  echo -e "Usage: ./collect_data"
+  exit
+fi
+
+# Set global script directives
+ROOT_DIR=..
+TIME=$(date +%s)
+OUTPUT_ROOT="${ROOT_DIR}/data/checkpointing_${TIME: 0 : 8}"
+OUTPUT_DIRE="${OUTPUT_ROOT}/output_${HOSTNAME}"
+CHKPNT_DIRE="/tmp/tcd2_checkpoints_${HOSTNAME}"
+
+# Reporting tools
+TOTAL_TESTS=63
+let CUR_TEST=1
+
+# Applications DB has available
+APPLICATIONS=( m t )
+APP_NAMES=( microbenchmark tpcc )
+
+# Construct arrays of the types, options, and output files
+TYPES=( --none n h h h p p p m )
+OPTIONS=( --none --none --none --dicthash --bloom --none --interleaved --hash_map_ipp --none )
+OUTPUT=( none naive hobbes hobbes_hashdict hobbes_bloom ping_pong ping_pong_ipp ping_pong_ipp_hm multiversion )
+RECOVERY=( none stringkeys stringkeys stringkeys stringkeys intkeys intkeys stringkeys stringkeys )
+
+# Initial script setup (ensure directories, add keys, etc.)
+cd ${ROOT_DIR}/src
+for app in `seq 0 1`;
+do {
+	mkdir -p ${OUTPUT_DIRE}/${APP_NAMES[$app]}
+} done
+
+###
+# The following function creates a dynamic defines file specific to our test
+#
+# @param    BATCH   How many batches should be set
+# @param    WARES   The number of warehouses to be used
+###
+function createDynamicDefines() {
+  # Rebuild the entire package (only if needed)
+  while [ -e EXCLUSIVE_LOCK ]
+  do {
+    sleep 0.01
+  } done
+
+  touch EXCLUSIVE_LOCK
+  let BATCH=$1
+  let WARES=$2
+  ACTIVE_TXNS=20000
+  str=""
+  if [ -e common/dynamic_defines.h ]; then
+    while read line;
+    do
+      str="$str$line\n"
+    done < common/dynamic_defines.h
+  fi
+
+  EXPECTED_OUTPUT="#define MAX_BATCH_SIZE ${BATCH}\n#define WAREHOUSES_PER_NODE ${WARES}\n#define MAX_ACTIVE_TXNS ${ACTIVE_TXNS}"
+  if [ "$str" != "${EXPECTED_OUTPUT}\n" ]; then
+    echo -e "\nNow creating the dynamic defines file..."
+    echo -e "$EXPECTED_OUTPUT" > common/dynamic_defines.h
+  fi
+  
+  if [ "$str" != "${EXPECTED_OUTPUT}\n" -o ! -e ${ROOT_DIR}/bin/deployment/db ]; then
+    echo -e "Rebuilding the entire package..."
+    make clean  > /dev/null 2> /dev/null;
+    make -j > /dev/null 2> /dev/null;
+    make > /dev/null 2> /dev/null;
+
+    if [ $? -ne 0 ]; then
+      echo -e "[FATAL]: There were build errors"
+      exit 1
+    fi
+  fi
+  rm EXCLUSIVE_LOCK
+}
+
+###
+# The following function actually runs the test you want to run
+#
+# @param    msg       Message to be echo to top of file
+# @param    usermsg   Message to print to the user before running test
+# @param    app       Which application should be run
+# @param    chkpnt    Which checkpointing scheme to be run
+# @param    dirty     If running dirty tests, which dirty test to be run
+###
+function runTest() {
+  echo -e "\n[${HOSTNAME}] RUNNING NEW TEST (${CUR_TEST}/${TOTAL_TESTS})\n====================="
+  let CUR_TEST=${CUR_TEST}+1
+
+  # Grab parameters
+  msg=${1}
+  usermsg=${2}
+  app=${3}
+  chkpnt=${4}
+  dirty=${5}
+  recovery=${6}
+
+  # Run the actual test
+  echo -e "Clearing out the checkpoints and priming output..."
+  rm ${CHKPNT_DIRE}/* > /dev/null 2> /dev/null
+  echo -en "NOW RUNNING: ${usermsg}... "
+  LD_LIBRARY_PATH=../ext/zeromq/src/.libs:../ext/protobuf/src/.libs:\../ext/googletest/lib/.libs:../ext/zookeeper/.libs:../ext/glog/lib64:../ext/leveldb ../bin/bin/calvin_ctl/calvinmaster 0 -D ~/calvindata  -C ${TYPES[$chkpnt]} ${OPTIONS[$chkpnt]} ${dirty} --application ${APPLICATIONS[$app]} ${recovery}  2> ${OUTPUT_DIRE}/${APP_NAMES[$app]}/${OUTPUT[$chkpnt]}_${msg}.out
+  echo -e "Completed"
+}
+
+
+############################### MICROBENCHMARK #################################
+# WORKLOAD TESTING
+###
+for i in 300 750;
+do {
+  # Create the dynamic batch size and number of warehouses per node
+  createDynamicDefines ${i} 4
+  
+  # Loop through all possible checkpoint types
+	for j in `seq 0 8`;
+	do {
+	  runTest "`echo \"$i / 6\" | bc`W" "`echo \"$i / 6\" | bc`% WORKLOAD, ${APP_NAMES[0]}, ${TYPES[$j]} ${OPTIONS[$j]}" 0 ${j}
+	} done
+} done
+
+###
+# DIRTY TESTING
+###
+createDynamicDefines 750 4
+for i in 1 20 50;
+do {
+	# Loop through all possible checkpoint types (only microbenchmark)
+	for j in `seq 0 8`;
+	do {
+	  runTest "${i}D" "${i}% DIRTY, 150% WORKLOAD, ${APP_NAMES[0]}, ${TYPES[$j]} ${OPTIONS[$j]}" 0 ${j} "--dirty ${i}"
+	} done
+} done
+
+################################ TPCC ##########################################
+# WORKLOAD TESTING
+###
+for i in 75 125;
+do {
+  # Create the dynamic batch size and number of warehouses per node
+  createDynamicDefines ${i} 4
+
+  # Loop through all possible checkpoint types
+	for j in `seq 0 8`;
+	do {
+	  runTest "${i}W" "${i}% WORKLOAD, ${APP_NAMES[1]}, ${TYPES[$j]} ${OPTIONS[$j]}" 1 ${j}
+	} done
+} done
+
+###
+# Recovery testing
+###
+for j in `seq 1 8`;
+do {
+  runTest "RECOVERY" "RECOVERY, ${APP_NAMES[1]}, ${TYPES[$j]} ${OPTIONS[$j]}" 1 ${j} --none "--recovery ${ROOT_DIR}/sample_cp/${RECOVERY[$j]}"
+} done
+
+
+################################################################################
+
+# Generate output
+cd ${ROOT_DIR}/data
+rm completed_data_capture
+ln --symbolic ${OUTPUT_ROOT} completed_data_capture
+./plot_all ${HOSTNAME}
+
+# Report to user
+echo -e "\n!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!\nData capture complete."

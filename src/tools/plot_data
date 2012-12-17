@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# Check cmd line args
+if [ $# -ne 3 -a $# -ne 4 ]; then
+  echo -e "Usage: ./plot_data [NODE_NAME] [APPLICATION] [WORKLOAD]"
+  exit
+fi
+
+# Get to correct directory
+cd "completed_data_capture/output_${1}/${2}" 2> /dev/null
+if [ $? -ne 0 ]; then
+   echo "${1}: Node name not found."
+#  echo -e "Node name not found.  Nodes that have data captured: "
+#  let i=0
+#  for host in aphid bumblebee cardinal chameleon cicada cobra cricket dolphin frog giraffe grizzly hippo hornet macaw monkey newt peacock perch rattlesnake rhino swan termite turtle viper
+#  do {
+#    printf "    * %-12s" ${host}
+#    let i=i+1
+#    if [ $(($i%4)) -eq 0 ]; then
+#      printf "\n"
+#    fi
+#  } done
+#  exit
+fi
+
+# For each file, plot the appropriate graphs as output
+plot $3
+
+# Open all graphs for user
+OUTPUT_DIR=../../plots/${1}/${2}
+if [ -f "${3}_plots.gif" ]; then
+  mkdir -p ${OUTPUT_DIR}
+  mv "${3}_plots.gif" ${OUTPUT_DIR}
+  cd ${OUTPUT_DIR}
+fi
+
+# Display all graphs
+if [ "$4" != "no-display" ]; then
+  killall -9 evince
+  evince "${3}_plots.gif" & 2>/dev/null >/dev/null
+fi
