@@ -1,0 +1,2 @@
+#! /bin/sh
+exec '/home/dastle/Documents/db3/ext/bison/bin/bison' -y "$@"
