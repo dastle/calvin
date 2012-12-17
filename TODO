@@ -1,0 +1,46 @@
+                            Calvin TODO list
+
+Bugs and documentation
+---------------------------------------------
+  - Lacking doxygen
+      + connection/connection.h
+      + common/utils.h
+      + common/types.h
+      + common/types_test.h
+      + common/configuration.h
+      + common/atomic.h
+      + scheduler/lock_manager.h
+      + scheduler/scheduler.h
+  - Namespace doxygenation
+  - Doxygenation of classes
+      + checkpointing/checkpointer.h
+      + checkpointing/ping_pong.h
+      + applications/microbenchmark/microbenchmark.h
+      + common/configuration.h
+      + connection/connection.h
+      + scheduler/lock_manager.h
+      + scheduler/scheduler.h
+  - Make LevelDB and checkpointing command line options via calvin_ctl
+      + Currently inaccessible
+  - Internal loadgen is broken
+  - Sequencer currently gets SQL, need it to be parsed/executed by Scheduler
+  - stored_procedures folder should really be inside bin/
+
+System Properties that Do Not Exist
+-----------------------------------
+  - Full TPC-C
+  - Failover on the fly
+  - Prefetching
+  - Arbitrary user-submitted python transaction code
+      + Sample banking application in Python
+  - (AARON FINAL PROJ) Dependent transactions (transformations on python code)
+  - (ANTON/MICHAEL FINAL PROJ) Queries and predicate matching
+
+System Design and Implementation
+--------------------------------
+  - (ALEX) Re-architect and restructure scheduler/sequencer
+  - (ALEX) Data model, key/val types, etc., should be optimized for infrequent copying
+    while allowing greater generality. In particular:
+      - SSKey-style keys, with explicit path/type/column. This would allow:
+          - Multiple locking granularities.
+          - System can manage blob vs. columnar storage.

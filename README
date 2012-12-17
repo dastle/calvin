@@ -1,0 +1,114 @@
+/**
+
+@mainpage Calvin
+@brief Fast Distributed Transactions for Partitioned Database Systems
+
+@section About About This Project
+    @todo Every file in this project really needs the proper heading, but some
+          still have the old crappy heading    
+
+Calvin is a massively-scalable transactional database solution that allows
+for concurrent, multi-threaded application execution while maintaining
+guarantees of ACIDity.  In order to do this, Calvin uses a pre-determined
+serial ordering of transactions to which every node must guarantee equivalence
+to.  In addition, Calvin contains several components that are used in
+both engineering and research efforts to document the viability of such
+a deterministic system.
+
+@section License
+(c) 2011 Professor Alexander Thomson, Daniel Abadi, Thaddeus Diamond, Philip Shao, Kun Ren, Shu-Chun Weng
+Yale University
+
+
+@section Prerequisites
+  - GNU/Linux distro >= 2.6.37.6
+  - G++ >= 4.5.1
+  - Satisfy all dependencies of the following external libraries
+      -# GoogleTest      - Google's Unit Testing Framework
+          - Object Linking: ext/googletest/lib/.libs
+          - Header Include: ext/googletest/include
+      -# ProtocolBuffers - Google's Framework for Serializable PODS
+          - Object Linking: ext/protobuf/src/.libs
+          - Header Include: ext/protobuf/src
+      -# ZeroMQ          - Efficient Message Passing System
+          - Object Linking: ext/zeromq/src/.libs
+          - Header Include: ext/zeromq/include
+      -# Zookeeper       - Apache Implementation of Paxos protocol
+          - Object Linking: ext/zookeeper/.libs
+          - Header Include: ext/zookeeper/include ext/zookeeper/generated
+
+@section Root Directory Contents
+
+  The source folder is comprised of several scripts and directories:
+     - README            - This file
+     - TODO              - A list of high-level and low-level project goals not done
+     - INSTALL           - A detailed (yet slightly outdated) list of installation instructions
+     - ./install-ext     - A script to install all external libraries linked to this project
+     - ./prepare_changes - A script that should be used for committing changes
+     - data/             - Contains data used in conference paper submissions
+     - doc/              - Contains a Doxygen setup file and a location for housing generated documentation
+     - ext/              - Contains several external libraries used in Calvin that must be compiled and linked to source
+     - src/              - The Calvin codebase
+
+@section Documentation
+
+    Documentation for this project is generated using Doxygen.  Documentation from the
+    master branch is available on the project website.
+
+    In order to generate complete documentation for this project locally, from within
+    the doc/ folder please run:
+
+    <pre>
+    doxygen Calvin.doxygen</pre>
+
+    From this directory.  Navigate in your web browser to file:///$(ROOT_PATH)/doc/html/index.html
+
+@section Installation
+
+  @subsection Libraries
+  In order to compile external libraries associated w/Calvin, please run: 
+
+    <pre>
+    $ ./install-ext
+	$ git checkout -- ext/*</pre>
+
+  @subsection Source
+  To compile the source, please run:
+
+    <pre>
+    $ make -C src</pre>
+
+  Three directories will be created: bin/, obj/ and logs/.
+   - logs/     - Where all logged output will be printed to (see documentation on common/logging.h)
+   - obj/      - Where all the .o and some .d (dependency files) are sent to
+   - bin/      - Where all the binary and some .d (dependency files) are written
+
+  In order to run an executable (including an individual test) simply invoke the
+  appropriate binary file from the command line.  For example, if you wanted to
+  run calvin_ctl (the executable for launching Calvin), you would invoke from
+  the root directory:
+
+    <pre>
+    $ cd bin
+    $ bin/calvin_ctl [OPTIONS]</pre>
+
+  Note that you must be sure that your LD_LIBRARY_PATH includes the object
+  files noted in the dependencies above.
+
+  Currently available binaries' source code can be found in src/bin, and when
+  invoked with the --help flag will display helpful information.
+
+@section Contributing Contributing to Project
+
+  This project is currently controlled under a Git-based source repository.  Commits
+  going to the master branch, however, should use the prepare_changes script, which
+  automatically converts your changes to a diff of the HEAD.  It is invoked as
+  follows:
+  
+    <pre>
+    ./prepare_changes "COMMIT_MESSAGE_HERE" [A]</pre>
+  
+  The second argument is optional and specifies whether newly created files should
+  be added to the repository.
+
+**/

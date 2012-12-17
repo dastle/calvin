@@ -1,0 +1,33 @@
+git submodule init
+git submodule update
+cd ext/zookeeper
+autoreconf -if
+./configure --prefix=$PWD
+make -j && make install
+cd ../zeromq
+./autogen.sh
+./configure --prefix=$PWD
+make -j
+cd ../protobuf
+./configure --prefix=$PWD
+make -j
+cd ../googletest
+./configure --prefix=$PWD
+make -j
+cd ../glog
+./configure --prefix=$PWD
+make -j && make install
+cd ../leveldb
+make -j
+cd ../bison
+find . -type f | xargs touch -t `date +%Y%m%d%H%M`
+./configure --prefix=$PWD
+make -j && make install
+cd ../flex
+./autogen.sh
+./configure --prefix=$PWD
+make -j
+
+# At the very end, we must use git checkout to revert all changed files that we don't want included
+cd ..
+git checkout -- ext/*

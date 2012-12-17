@@ -1,0 +1,24 @@
+
+
+if [ $# -ne 1 -a $# -ne 2 ]; then
+  echo "Usage: ./prepare_changes \"Commit Message\" [A - Add all]"
+  exit $E_BADARGS
+fi
+
+git commit -am "THIS SHOULD NOT SHOW UP IN GIT REPO"
+git fetch origin HEAD && git checkout FETCH_HEAD
+git checkout -b new_branch
+git format-patch new_branch..master --stdout > patchfile &&
+git apply patchfile
+
+if [ $? -le 1 ]; then
+  if [ "$2" == "A" ]; then
+    git add .
+  fi
+
+  mv patchfile .. &&
+  git branch -m master `date +%s` &&
+  git branch -m new_branch master &&
+  git commit -am "$1" &&
+  git push origin HEAD:refs/for/master
+fi
