@@ -5,12 +5,28 @@ caravan::ClusterManager::ClusterManager() {
 }
 
 
-caravan::Machine::Machine(MachineID id, unsigned int port) {
+void caravan::Machine::Initialize(MachineID id, unsigned int port) {
   port_ = port;
   socket_fd_set_ = new fd_set();
   FD_ZERO(socket_fd_set_);
   machine_id_ = id;
   isSocketInitialized_ = false;
+}
+
+caravan::Machine::Machine(MachineID id, unsigned int port) {
+  Initialize(id, port);
+}
+
+caravan::Machine::Machine(MachineID id, const MachineConfig& config) {
+  for (int i = 0; i < config.all_nodes.size(); i++) {
+    Node *node = config.all_nodes[i];
+    if ((MachineID)node->node_id == id) {
+      Initialize(id, node->port);
+    }
+    else {
+      AddMachine(node->node_id, node->host, node->port);
+    }
+  }
 }
 
 caravan::Machine::~Machine() {

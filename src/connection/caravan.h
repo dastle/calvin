@@ -10,6 +10,7 @@
 #include "stdlib.h"
 #include "pthread.h"
 #include <fcntl.h>
+#include "common/configuration.h"
 
 namespace caravan {
 
@@ -133,6 +134,8 @@ class Machine {
  public:
     
   Machine(MachineID id, unsigned int port);
+  Machine(MachineID id, const MachineConfig& config);
+
   ~Machine();
 
   // Returns this machine instance's id.
@@ -162,6 +165,8 @@ class Machine {
 
 private:
 
+
+  void Initialize(MachineID id, unsigned int port);
   void InitializeListenerSocket();
 
   static void *ListenerLoop(void *arg) {

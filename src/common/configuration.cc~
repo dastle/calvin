@@ -45,6 +45,7 @@ MachineConfig::MachineConfig(const string& filename) {
     // Process the rest of the line, which has the format "<key>=<value>".
     char* key = strtok_r(p, "=\n", &tok);
     char* value = strtok_r(NULL, "=\n", &tok);
+    printf("Key: %s, Value: %s\n", key, value);
     ProcessConfigLine(key, value);
   }
   fclose(fp);

@@ -28,6 +28,7 @@ class ConnectionTest {
 };
 
 
+
 void TestConnection() {
   Machine machine0(0, 50000);
   Machine machine1(1, 50001);
@@ -145,6 +146,36 @@ TEST(ConnectionTest, ShouldAllowTwoNodesTalkingToEachOther) {
   EXPECT_STREQ("Hello world!", receivedMsg->data());
   machine0.StopListening();
   machine1.StopListening();
+}
+
+TEST(ConnectionTest, ShouldAllowMachineConfigConnect) {
+  const char *file = "common/configuration_test.conf";
+  MachineConfig config(file);
+  Machine machine0(0, config);
+  Machine machine1(1, config);
+  EXPECT_FALSE(machine1.IsConnectedTo(0));
+  EXPECT_FALSE(machine0.IsConnectedFrom(1));
+  machine0.StartListening();
+  machine1.Connect(0);
+  EXPECT_TRUE(machine1.IsConnectedTo(0));
+  EXPECT_TRUE(machine0.IsConnectedFrom(1));
+  machine0.StopListening();
+}
+
+
+TEST(ConnectionTest, ShouldAllowMachineConfigMessages) {
+  const char *file = "common/configuration_test.conf";
+  MachineConfig config(file);
+  Machine machine0(0, config);
+  Machine machine1(1, config);
+  machine0.StartListening();
+  machine1.Connect(0);
+  const char *msgText = "Hello world!";
+  Slice msg(msgText);
+  machine1.SendMessage(0, &msg);
+  caravan::Message *receivedMsg = machine0.ReceiveMessage();
+  EXPECT_STREQ("Hello world!", receivedMsg->data());
+  machine0.StopListening();
 }
 
 

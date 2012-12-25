@@ -10,6 +10,7 @@
 #include "stdlib.h"
 #include "pthread.h"
 #include <fcntl.h>
+#include "common/configuration.h"
 
 namespace caravan {
 
@@ -104,7 +105,7 @@ class Message {
     Message(char* body, int size, int sourceID) {
       data_ = body;
       body_size_ = size;
-      source_id_ = sourceiD;
+      source_id_ = sourceID;
     }
   
     int size() {
@@ -133,6 +134,8 @@ class Machine {
  public:
     
   Machine(MachineID id, unsigned int port);
+  Machine(MachineID id, const MachineConfig& config);
+
   ~Machine();
 
   // Returns this machine instance's id.
