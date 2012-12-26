@@ -158,6 +158,11 @@ class Machine {
   void AddMachine(MachineID otherID, const std::string& ipAddress, unsigned int port);
   bool Connect(MachineID machineID);
   void Listen();
+
+  // receive all messages from all sockets and put them in the respective queues. returns true if
+  // at least one msg is received.
+  bool PutMessagesInQueue();
+
   Message *ReceiveMessage();
 
   // Sends a message that can be retrieved by calling GetMessage('channel', ...)
@@ -208,6 +213,7 @@ private:
   bool stopListening_;
   bool isSocketInitialized_;
   char send_buf_[255];
+  std::map<string,vector<string> > message_map_;
 };
 
 

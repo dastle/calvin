@@ -200,7 +200,6 @@ TEST(ConnectionTest, ShouldAllowMachineConfigMessages) {
   machine0.StopListening();
 }
 
-
 TEST(ConnectionTest, ShouldUseChannel) {
   ConnectionTest t; 
   const char *file = "common/configuration_test.conf";
@@ -215,6 +214,28 @@ TEST(ConnectionTest, ShouldUseChannel) {
   caravan::Message *receivedMsg = machine0.ReceiveMessage();
   EXPECT_STREQ("Hello world!", receivedMsg->data());
   EXPECT_STREQ("english", receivedMsg->channel());
+  machine0.StopListening();
+}
+
+
+
+TEST(ConnectionTest, ShouldUseChannelQueue) {
+  ConnectionTest t; 
+  const char *file = "common/configuration_test.conf";
+  MachineConfig config(file);
+  Machine machine0(0, config);
+  Machine machine1(1, config);
+  machine0.StartListening();
+  machine1.Connect(0);
+  const char *msgText = "Hello world!";
+  Slice msg(msgText);
+  machine1.SendMessage(0, t.DefaultChannel(), msg);
+  bool found = machine0.PutMessagesInQueue();
+  EXPECT_TRUE(found);
+  string *data;
+  bool success = machine0.GetMessage(t.DefaultChannel(), &data);
+  EXPECT_STREQ("Hello world!", data->c_str());
+  delete data;
   machine0.StopListening();
 }
 
@@ -253,7 +274,7 @@ TEST(ConnectionTest, ShouldSendAndReceiveManyMessages) {
   printf("Elapsed seconds: %d\n", elapsedSeconds);
   double messagesPerSecond = (double)n / elapsedSeconds;
   printf("Messages per second: %f\n", messagesPerSecond);
-  EXPECT_GT(messagesPerSecond, 900000.0);
+  EXPECT_GT(messagesPerSecond, 800000.0);
   machine0.StopListening();
   machine1.StopListening();
 }

@@ -1,5 +1,6 @@
 #include "connection/caravan.h"
 #include <errno.h>
+using leveldb::Slice;
 
 caravan::ClusterManager::ClusterManager() {
 }
@@ -175,6 +176,7 @@ void caravan::Machine::Listen() {
   memset(buf, 0, sizeof(buf));
   if (newSocketHandle <= 0) {
     perror("No new socket accepted");
+    sleep(1);
   } 
   else {
     // Receive machine ID
@@ -200,6 +202,45 @@ void caravan::Machine::Listen() {
     newSocket->Connected = true;
     sockets_in_[otherID] = newSocket;
   }
+}
+
+bool caravan::Machine::GetMessage(const Slice& channel, string** message) {
+  map<string,vector<string> >::iterator it = message_map_.find(channel.ToString());
+  if(it == message_map_.end()) {
+    // Channel does not exist
+    return false;
+  }
+  vector<string> messages = message_map_[channel.ToString()];
+  if (messages.size() == 0) {
+    return false;
+  }
+  *message = new string(messages.back().c_str());
+  messages.pop_back();
+  return true;
+}
+
+bool caravan::Machine::PutMessagesInQueue() {
+  char buf[255];
+  memset(buf, 0, 255);
+  bool msgFound = false;
+  for ( std::map< MachineID, Socket * >::const_iterator iter = sockets_in_.begin(); iter != sockets_in_.end(); ++iter ) {
+    if (iter->second->Connected) {
+      if (FD_ISSET(iter->second->Handle,socket_fd_set_)) {
+        int result = recv(iter->second->Handle, buf, 255, 0);
+        if (result > 0) {
+          int channelLength = strlen(buf);
+          char *bufPtr = (char *)buf;
+          int dataLength = strlen(bufPtr + channelLength + 1);
+          string data(bufPtr + channelLength + 1);
+          string channel(bufPtr);
+          std::vector<string>::iterator it = message_map_[channel].begin();
+          msgFound = true;
+          message_map_[channel].insert(it, data);
+        }
+      }
+    }
+  }
+  return msgFound;
 }
 
 caravan::Message *caravan::Machine::ReceiveMessage() {
