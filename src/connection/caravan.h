@@ -207,6 +207,7 @@ private:
   pthread_t listenerThread_;
   bool stopListening_;
   bool isSocketInitialized_;
+  char send_buf_[255];
 };
 
 

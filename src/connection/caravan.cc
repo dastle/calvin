@@ -119,12 +119,11 @@ void caravan::Machine::AddMachine(MachineID otherID, const string& ipAddress, un
 void caravan::Machine::SendMessage(MachineID destination, const Slice& channel, const Slice& message) {
   int outSocket = sockets_out_[destination]->Handle;
   int bufSize = channel.size() + message.size() + 2;
-  char buf[bufSize];
-  char *bufPtr = (char *)buf;
-  strcpy(buf, channel.data());
-  buf[channel.size()] = 0;
+  char *bufPtr = (char *)send_buf_;
+  strcpy(send_buf_, channel.data());
+  send_buf_[channel.size()] = 0;
   strcpy(bufPtr + channel.size() + 1, message.data());
-  send(outSocket, buf, bufSize, 0);
+  send(outSocket, send_buf_, bufSize, 0);
 }
 
 void caravan::Machine::InitializeListenerSocket() {

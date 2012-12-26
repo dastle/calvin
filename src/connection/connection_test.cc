@@ -15,6 +15,7 @@
 #include "common/utils.h"
 #include "connection/caravan.h"
 #include <unistd.h>
+#include <time.h>
 #define GetCurrentDir getcwd
 
 #include <gtest/gtest.h>
@@ -215,6 +216,46 @@ TEST(ConnectionTest, ShouldUseChannel) {
   EXPECT_STREQ("Hello world!", receivedMsg->data());
   EXPECT_STREQ("english", receivedMsg->channel());
   machine0.StopListening();
+}
+
+// @todo This garbage should be put in the ConnectionTest class
+unsigned long N = 10000000;
+void *SendManyMessagesTread(void *arg) {
+  Machine *machine =  (Machine *)arg;
+  for (unsigned long i = 0; i < N; i++) {
+    caravan::Message *receivedMsg = machine->ReceiveMessage();
+  }
+  return NULL;
+}
+
+TEST(ConnectionTest, ShouldSendAndReceiveManyMessages) {
+  ConnectionTest t;
+  Machine machine0(0, 50000);
+  Machine machine1(1, 50001);
+  machine0.AddMachine(1, "127.0.0.1", 50001);
+  machine1.AddMachine(0, "127.0.0.1", 50000);
+  machine0.StartListening();
+  machine1.StartListening();
+  machine0.Connect(1);
+  machine1.Connect(0);
+  const char *buf = "Hello world!";
+  Slice msg(buf);
+  pthread_t sendThread;
+  pthread_create(&sendThread, NULL, &SendManyMessagesTread, (void *)&machine1);
+  time_t start = time(0);
+  unsigned long n = N;
+  for (unsigned long i = 0; i < n; i++) {   
+    machine0.SendMessage(1, t.DefaultChannel(), msg);
+  }
+  time_t end = time(0);
+  pthread_join(sendThread, NULL);
+  int elapsedSeconds = (int)difftime(end, start);
+  printf("Elapsed seconds: %d\n", elapsedSeconds);
+  double messagesPerSecond = (double)n / elapsedSeconds;
+  printf("Messages per second: %f\n", messagesPerSecond);
+  EXPECT_GT(messagesPerSecond, 900000.0);
+  machine0.StopListening();
+  machine1.StopListening();
 }
 
 
