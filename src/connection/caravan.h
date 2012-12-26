@@ -100,16 +100,28 @@ class MachineOptions {
   //... other options?
 };
 
+
+
 class Message {
   public:
-    Message(char* body, int size, int sourceID) {
+    Message(char* body, int size, int sourceID, char* channel, int channel_size) {
       data_ = body;
       body_size_ = size;
       source_id_ = sourceID;
+      channel_ = channel;
+      channel_size_ = channel_size;
     }
   
     int size() {
       return body_size_;
+    }
+
+    int channel_size() {
+      return channel_size_;
+    }
+
+    char *channel() {
+      return channel_;
     }
 
     MachineID GetSourceID(){
@@ -127,6 +139,8 @@ class Message {
   private:
     char* data_;
     int body_size_;
+    char* channel_;
+    int channel_size_;
     MachineID source_id_;
 };
 
@@ -150,7 +164,8 @@ class Machine {
   // on the destination machine.
   void SendMessage(
       MachineID destination,
-      const Slice *message);
+      const Slice& channel,
+      const Slice& message);
 
   // Dequeue a message from the local queue for the specified channel. If such
   // a message exists, sets '*message' to point to it (the caller takes

@@ -25,6 +25,22 @@ using caravan::Machine;
 using leveldb::Slice;
 
 class ConnectionTest {
+ public:
+    ConnectionTest() {
+       const char *channelText = "english";
+       channel = new Slice(channelText);
+    }
+
+    ~ConnectionTest() {
+      delete channel;
+    }
+
+    Slice DefaultChannel() {
+      return *channel;
+    }
+
+ private:
+  Slice *channel;
 };
 
 
@@ -62,7 +78,9 @@ TEST(ConnectionTest, SendMessageOneNode) {
   machine1.Connect(0);
   const char *msgText = "Hello world!";
   Slice msg(msgText);
-  machine1.SendMessage(0, &msg);
+  const char *channelText = "english";
+  Slice channel(channelText);
+  machine1.SendMessage(0, channel, msg);
   caravan::Message *receivedMsg = machine0.ReceiveMessage();
   EXPECT_STREQ("Hello world!", receivedMsg->data());
   machine0.StopListening();
@@ -81,6 +99,7 @@ TEST(ConnectionTest, ShouldReceiveNullMessageIfNothingSent) {
 }
 
 TEST(ConnectionTest, SendMessageTwoNodes) {
+  ConnectionTest t;
   Machine machine0(0, 50000);
   Machine machine1(1, 50001);
   Machine machine2(2, 50002);
@@ -99,8 +118,8 @@ TEST(ConnectionTest, SendMessageTwoNodes) {
   const char *msgText2 = "Goodbye world!";
   Slice msg(msgText);
   Slice msg2(msgText2);  
-  machine1.SendMessage(0, &msg);
-  machine2.SendMessage(0, &msg2);
+  machine1.SendMessage(0, t.DefaultChannel(), msg);
+  machine2.SendMessage(0, t.DefaultChannel(), msg2);
   caravan::Message *receivedMsg = machine0.ReceiveMessage();
   EXPECT_STREQ("Hello world!", receivedMsg->data());
   EXPECT_EQ(1, receivedMsg->GetSourceID());
@@ -122,12 +141,13 @@ TEST(ConnectionTest, ShouldAllowTwoNodesConnectingToEachOther) {
   EXPECT_TRUE(machine0.IsConnectedTo(1));
   EXPECT_TRUE(machine0.IsConnectedFrom(1));
   EXPECT_TRUE(machine1.IsConnectedTo(0));
-  EXPECT_TRUE(machine1.IsConnectedTo(0));
+  EXPECT_TRUE(machine1.IsConnectedFrom(0));
   machine0.StopListening();
   machine1.StopListening();
 }
 
 TEST(ConnectionTest, ShouldAllowTwoNodesTalkingToEachOther) {
+  ConnectionTest t;
   Machine machine0(0, 50000);
   Machine machine1(1, 50001);
   machine0.AddMachine(1, "127.0.0.1", 50001);
@@ -138,10 +158,10 @@ TEST(ConnectionTest, ShouldAllowTwoNodesTalkingToEachOther) {
   machine1.Connect(0);
   const char *msgText = "Hello world!";
   Slice msg(msgText);
-  machine1.SendMessage(0, &msg);
+  machine1.SendMessage(0, t.DefaultChannel(), msg);
   caravan::Message *receivedMsg = machine0.ReceiveMessage();
   EXPECT_STREQ("Hello world!", receivedMsg->data());
-  machine0.SendMessage(1, &msg);
+  machine0.SendMessage(1, t.DefaultChannel(), msg);
   receivedMsg = machine1.ReceiveMessage();
   EXPECT_STREQ("Hello world!", receivedMsg->data());
   machine0.StopListening();
@@ -164,6 +184,7 @@ TEST(ConnectionTest, ShouldAllowMachineConfigConnect) {
 
 
 TEST(ConnectionTest, ShouldAllowMachineConfigMessages) {
+  ConnectionTest t;
   const char *file = "common/configuration_test.conf";
   MachineConfig config(file);
   Machine machine0(0, config);
@@ -172,9 +193,27 @@ TEST(ConnectionTest, ShouldAllowMachineConfigMessages) {
   machine1.Connect(0);
   const char *msgText = "Hello world!";
   Slice msg(msgText);
-  machine1.SendMessage(0, &msg);
+  machine1.SendMessage(0, t.DefaultChannel(), msg);
   caravan::Message *receivedMsg = machine0.ReceiveMessage();
   EXPECT_STREQ("Hello world!", receivedMsg->data());
+  machine0.StopListening();
+}
+
+
+TEST(ConnectionTest, ShouldUseChannel) {
+  ConnectionTest t; 
+  const char *file = "common/configuration_test.conf";
+  MachineConfig config(file);
+  Machine machine0(0, config);
+  Machine machine1(1, config);
+  machine0.StartListening();
+  machine1.Connect(0);
+  const char *msgText = "Hello world!";
+  Slice msg(msgText);
+  machine1.SendMessage(0, t.DefaultChannel(), msg);
+  caravan::Message *receivedMsg = machine0.ReceiveMessage();
+  EXPECT_STREQ("Hello world!", receivedMsg->data());
+  EXPECT_STREQ("english", receivedMsg->channel());
   machine0.StopListening();
 }
 

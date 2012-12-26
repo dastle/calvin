@@ -116,9 +116,15 @@ void caravan::Machine::AddMachine(MachineID otherID, const string& ipAddress, un
 }
 
 
-void caravan::Machine::SendMessage(MachineID destination, const Slice *message) {
+void caravan::Machine::SendMessage(MachineID destination, const Slice& channel, const Slice& message) {
   int outSocket = sockets_out_[destination]->Handle;
-  send(outSocket, message->data(), message->size(), 0);
+  int bufSize = channel.size() + message.size() + 2;
+  char buf[bufSize];
+  char *bufPtr = (char *)buf;
+  strcpy(buf, channel.data());
+  buf[channel.size()] = 0;
+  strcpy(bufPtr + channel.size() + 1, message.data());
+  send(outSocket, buf, bufSize, 0);
 }
 
 void caravan::Machine::InitializeListenerSocket() {
@@ -205,7 +211,10 @@ caravan::Message *caravan::Machine::ReceiveMessage() {
       if (FD_ISSET(iter->second->Handle,socket_fd_set_)) {
         int result = recv(iter->second->Handle, buf, 255, 0);
         if (result > 0) {
-          Message *msg = new Message(buf, 255, iter->first);
+          int channelLength = strlen(buf);
+          char *bufPtr = (char *)buf;
+          int dataLength = strlen(bufPtr + channelLength + 1);
+          Message *msg = new Message(bufPtr + channelLength + 1, dataLength, iter->first, buf, channelLength);
           return msg;
         }
       }
