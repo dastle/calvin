@@ -27,24 +27,20 @@ using leveldb::Slice;
 
 class ConnectionTest {
  public:
-    ConnectionTest() {
-       const char *channelText = "english";
-       channel = new Slice(channelText);
-    }
+    ConnectionTest() : channel("english") {}
 
     ~ConnectionTest() {
-      delete channel;
     }
 
-    Slice DefaultChannel() {
-      return *channel;
+    string DefaultChannel() {
+      return channel;
     }
 
  private:
-  Slice *channel;
+  string channel;
 };
 
-
+////////////////////////// Test Connecting //////////////////////////////////
 
 void TestConnection() {
   Machine machine0(0, 50000);
@@ -69,6 +65,8 @@ TEST(ConnectionTest, ShouldConnectMultipleTimes) {
   TestConnection();
   TestConnection();
 }
+
+////////////////////////// Test Basic Send/Receive ///////////////////////////
 
 TEST(ConnectionTest, SendMessageOneNode) {
   Machine machine0(0, 50000);
@@ -241,7 +239,7 @@ TEST(ConnectionTest, ShouldUseChannelQueue) {
 
 // @todo This garbage should be put in the ConnectionTest class
 unsigned long N = 10000000;
-void *SendManyMessagesTread(void *arg) {
+void *SendManyMessagesThread(void *arg) {
   Machine *machine =  (Machine *)arg;
   for (unsigned long i = 0; i < N; i++) {
     caravan::Message *receivedMsg = machine->ReceiveMessage();

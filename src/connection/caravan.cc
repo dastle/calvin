@@ -31,31 +31,20 @@ caravan::Machine::Machine(MachineID id, const MachineConfig& config) {
 }
 
 caravan::Machine::~Machine() {
-  // Free sockets
-  for ( std::map< MachineID, Socket * >::const_iterator iter = sockets_out_.begin(); iter != sockets_out_.end(); ++iter ) {
+  // Close/free out sockets
+  for (map<MachineID, Socket*>::const_iterator iter = sockets_out_.begin();
+       iter != sockets_out_.end(); ++iter) {
     if (iter->second->Connected) {
       // Make closing the socket do a hard disconnect FOR NOW
       // TODO: Make disconnects graceful
       linger lingerOption;
-      lingerOption.l_onoff = 1;
+      // Setting l_onoff to on and l_linger to 0 causes a hard disconnect by NOT
+      // waiting for handshake ack for disconnecting.
+      linger_option.l_onoff = 1;
       lingerOption.l_linger = 0;
-      if (setsockopt(iter->second->Handle, SOL_SOCKET,  SO_LINGER, (char *)&lingerOption, sizeof(linger)) < 0) {
-        perror("setsockopt() failed linger on iterator");
-      }
-    }
-    close(iter->second->Handle);
-    free(iter->second);
 
-  }
-
-  for ( std::map< MachineID, Socket * >::const_iterator iter = sockets_in_.begin(); iter != sockets_in_.end(); ++iter ) {
-    if (iter->second->Connected) {
-      // Make closing the socket do a hard disconnect FOR NOW
-      // TODO: Make disconnects graceful
-      linger lingerOption;
-      lingerOption.l_onoff = 1;
-      lingerOption.l_linger = 0;
-      if (setsockopt(iter->second->Handle, SOL_SOCKET,  SO_LINGER, (char *)&lingerOption, sizeof(linger)) < 0) {
+      if (setsockopt(iter->second->Handle, SOL_SOCKET, SO_LINGER,
+          (char*)&lingerOption, sizeof(linger)) < 0) {
         perror("setsockopt() failed linger on iterator");
       }
     }
@@ -63,6 +52,25 @@ caravan::Machine::~Machine() {
     free(iter->second);
   }
 
+  // Close/free in sockets
+  for (map<MachineID, Socket*>::const_iterator iter = sockets_in_.begin();
+       iter != sockets_in_.end(); ++iter) {
+    if (iter->second->Connected) {
+      // Make closing the socket do a hard disconnect FOR NOW
+      // TODO: Make disconnects graceful
+      linger lingerOption;
+      lingerOption.l_onoff = 1;
+      lingerOption.l_linger = 0;
+      if (setsockopt(iter->second->Handle, SOL_SOCKET, SO_LINGER,
+          (char*)&lingerOption, sizeof(linger)) < 0) {
+        perror("setsockopt() failed linger on iterator");
+      }
+    }
+    close(iter->second->Handle);
+    free(iter->second);
+  }
+
+  // Close/free connection listener socket
   if (isSocketInitialized_) {
     linger lingerOption;
     lingerOption.l_onoff = 1;
@@ -70,12 +78,14 @@ caravan::Machine::~Machine() {
     // Make closing the socket do a hard disconnect FOR NOW
     // TODO: Make disconnects graceful
     if (fcntl(inSocketHandle_, F_GETFD) == 0) {
-      if (setsockopt(inSocketHandle_, SOL_SOCKET,  SO_LINGER, (char *)&lingerOption, sizeof(linger)) < 0) {
+      if (setsockopt(inSocketHandle_, SOL_SOCKET, SO_LINGER,
+          (char *)&lingerOption, sizeof(linger)) < 0) {
         perror("setsockopt() failed destruct");
       }
     }
     close(inSocketHandle_);
   }
+  // Some voodoo for cleaning up file descriptors that we're done with.
   FD_ZERO(socket_fd_set_);
   delete socket_fd_set_;
 }

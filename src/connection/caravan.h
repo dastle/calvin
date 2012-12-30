@@ -17,9 +17,11 @@ namespace caravan {
 using std::string;
 using leveldb::Slice;
 using leveldb::Status;
+using std::map;
 
 typedef unsigned long long MachineID;
 
+typedef string ChannelID;
 
 // Representation of cluster status (for tracking all (other) nodes in cluster)
 struct ClusterState {
@@ -103,45 +105,47 @@ class MachineOptions {
 
 
 class Message {
-  public:
-    Message(char* body, int size, int sourceID, char* channel, int channel_size) {
-      data_ = body;
-      body_size_ = size;
-      source_id_ = sourceID;
-      channel_ = channel;
-      channel_size_ = channel_size;
-    }
+ public:
+  Message(char* body, int size, int sourceID, char* channel, int channel_size) {
+    data_ = body;
+    body_size_ = size;
+    source_id_ = sourceID;
+    channel_ = channel;
+    channel_size_ = channel_size;
+  }
+
+  int size() {
+    return body_size_;
+  }
+
+  int channel_size() {
+    return channel_size_;
+  }
+
+  char *channel() {
+    return channel_;
+  }
+
+  MachineID GetSourceID(){
+    return source_id_;
+  }
   
-    int size() {
-      return body_size_;
-    }
+  char *data() {
+    return data_;
+  }
 
-    int channel_size() {
-      return channel_size_;
-    }
+  ~Message() {
+    delete data_;
+  }
 
-    char *channel() {
-      return channel_;
-    }
-
-    MachineID GetSourceID(){
-      return source_id_;
-    }
-    
-    char *data() {
-      return data_;
-    }
-
-    ~Message() {
-      delete data_;
-    }
-
-  private:
-    char* data_;
-    int body_size_;
-    char* channel_;
-    int channel_size_;
-    MachineID source_id_;
+ private:
+  // Pointer to the buffer containing message body data. NOT a null-terminated
+  // C-style string.
+  char* data_;
+  int body_size_;
+  char* channel_;
+  int channel_size_;
+  MachineID source_id_;
 };
 
 class Machine {
@@ -184,8 +188,6 @@ class Machine {
   bool IsConnectedFrom(MachineID machineID);
 
 private:
-
-
   void Initialize(MachineID id, unsigned int port);
   void InitializeListenerSocket();
 
@@ -203,11 +205,16 @@ private:
 
   // This needs to be a ptr because if it isn't, the sockets won't close correctly for some reason
   fd_set *socket_fd_set_;
+
+  // Globally unique identifier for this machine instance
   MachineID machine_id_;
+
+  // Port used for listening to incoming connections
   unsigned int port_;
-  std::map<MachineID,Socket *> sockets_out_;
-  std::map<MachineID,Socket *> sockets_in_;
-  std::map<string,MachineID> ip_id_map_;
+
+  map<MachineID,Socket *> sockets_out_;
+  map<MachineID,Socket *> sockets_in_;
+  map<string,MachineID> ip_id_map_;
   int inSocketHandle_;
   pthread_t listenerThread_;
   bool stopListening_;
